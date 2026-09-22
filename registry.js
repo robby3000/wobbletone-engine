@@ -13,6 +13,7 @@
 
 import { BLEND_MODES } from "./color.js";
 import * as pointwise from "./effects/pointwise.js";
+import * as tone from "./effects/tone.js";
 
 const num = (min, max, def, opts = {}) => ({ kind: "number", min, max, default: def, ...opts });
 const sel = (options, def) => ({ kind: "select", options, default: def });
@@ -35,16 +36,19 @@ export const EFFECTS = {
   /* ---- tone ---- */
   duotone: {
     category: "tone",
+    apply: tone.duotone,
     params: { shadow: col("#1a0d3d"), highlight: col("#ff5c8a"), contrast: num(0, 100, 20, { unit: "%" }) },
   },
   tritone: {
     category: "tone",
+    apply: tone.tritone,
     params: { shadow: col("#0b1d3a"), mid: col("#c44d4d"), highlight: col("#ffe8a3") },
   },
-  posterize: { category: "tone", params: { steps: num(2, 16, 5) } },
-  heatmap: { category: "tone", params: { intensity: num(0, 100, 100, { unit: "%" }) } },
+  posterize: { category: "tone", apply: tone.posterize, params: { steps: num(2, 16, 5) } },
+  heatmap: { category: "tone", apply: tone.heatmap, params: { intensity: num(0, 100, 100, { unit: "%" }) } },
   drama: {
     category: "tone",
+    apply: tone.drama,
     params: {
       style: sel(["Cinematic", "Noir", "Bleach", "Storm", "Portrait"], "Cinematic"),
       strength: num(0, 100, 70, { unit: "%" }),
@@ -70,6 +74,7 @@ export const EFFECTS = {
   },
   chromatic: {
     category: "composite",
+    apply: tone.chromatic,
     params: { offset: num(0, 20, 4, { unit: "px", px: true }), strength: num(0, 100, 70, { unit: "%" }) },
   },
   dropshadow: {

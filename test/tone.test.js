@@ -1,0 +1,170 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { EFFECTS } from "../registry.js";
+import {
+  duotone, tritone, posterize, posterizeByte, heatmap, drama, dramaSettings,
+  chromatic, mapPixelColor,
+} from "../effects/tone.js";
+
+// These cases are ported from wobbletonefx tests/pixel-effects.test.js —
+// the pinned byte values are identical; they now pin the engine's semantics.
+
+function pixels(values, width = values.length) {
+  return { data: new Uint8ClampedArray(values.flat()), width, height: values.length / width };
+}
+
+test("duotone maps black to shadow and white to adjusted highlight", () => {
+  const image = pixels([[0, 0, 0, 91], [255, 255, 255, 173]]);
+  duotone(image, { shadow: "#102030", highlight: "#e0d0c0", contrast: 0 });
+  assert.deepEqual([...image.data], [16, 32, 48, 91, 224, 208, 192, 173]);
+});
+
+test("duotone contrast pushes the highlight outward from mid-gray", () => {
+  const c50 = pixels([[255, 255, 255, 255]]);
+  duotone(c50, { shadow: "#102030", highlight: "#e0d0c0", contrast: 50 });
+  assert.deepEqual([...c50.data], [255, 248, 224, 255]);
+  const c100 = pixels([[255, 255, 255, 255]]);
+  duotone(c100, { shadow: "#102030", highlight: "#e0d0c0", contrast: 100 });
+  assert.deepEqual([...c100.data], [255, 255, 255, 255]);
+});
+
+test("tritone maps midpoint luminance to the midtone", () => {
+  const image = pixels([[128, 128, 128, 255]]);
+  tritone(image, { shadow: "#000000", mid: "#804020", highlight: "#ffffff" });
+  assert.ok(Math.abs(image.data[0] - 128) <= 1);
+  assert.ok(Math.abs(image.data[1] - 64) <= 1);
+  assert.ok(Math.abs(image.data[2] - 32) <= 1);
+});
+
+test("tritone maps the endpoints exactly", () => {
+  const black = pixels([[0, 0, 0, 255]]);
+  tritone(black, { shadow: "#000000", mid: "#804020", highlight: "#ffffff" });
+  assert.deepEqual([...black.data], [0, 0, 0, 255]);
+  const white = pixels([[255, 255, 255, 255]]);
+  tritone(white, { shadow: "#000000", mid: "#804020", highlight: "#ffffff" });
+  assert.deepEqual([...white.data], [255, 255, 255, 255]);
+});
+
+test("posterize uses discrete-table band boundaries", () => {
+  assert.equal(posterizeByte(0, 4), 0);
+  assert.equal(posterizeByte(63, 4), 0);
+  assert.equal(posterizeByte(64, 4), 85);
+  assert.equal(posterizeByte(255, 4), 255);
+});
+
+test("posterize applies per channel and preserves alpha", () => {
+  const image = pixels([[63, 64, 255, 77]]);
+  posterize(image, { steps: 4 });
+  assert.deepEqual([...image.data], [0, 85, 255, 77]);
+});
+
+test("heatmap changes colour and preserves alpha", () => {
+  const image = pixels([[120, 80, 40, 37]]);
+  heatmap(image, { intensity: 100 });
+  assert.equal(image.data[3], 37);
+  assert.notDeepEqual([...image.data.slice(0, 3)], [120, 80, 40]);
+});
+
+test("heatmap known luminance mappings", () => {
+  const mid = pixels([[128, 128, 128, 255]]);
+  heatmap(mid, { intensity: 100 });
+  assert.deepEqual([...mid.data], [135, 39, 82, 255]);
+  const dark = pixels([[64, 64, 64, 255]]);
+  heatmap(dark, { intensity: 100 });
+  assert.deepEqual([...dark.data], [42, 3, 112, 255]);
+});
+
+test("heatmap intensity scales the palette", () => {
+  const half = pixels([[200, 200, 200, 255]]);
+  heatmap(half, { intensity: 50 });
+  assert.deepEqual([...half.data], [118, 85, 7, 255]);
+});
+
+test("chromatic aberration shifts red and blue in opposing directions", () => {
+  const image = pixels([[10, 1, 20, 255], [30, 2, 40, 255], [50, 3, 60, 255]], 3);
+  chromatic(image, { offset: 1, strength: 100 });
+  assert.deepEqual([...image.data], [10, 1, 40, 255, 10, 2, 60, 255, 30, 3, 60, 255]);
+});
+
+test("chromatic offset 0 is identity and strength 0 is identity", () => {
+  const off0 = pixels([[10, 20, 30, 255]]);
+  chromatic(off0, { offset: 0, strength: 100 });
+  assert.deepEqual([...off0.data], [10, 20, 30, 255]);
+  const s0 = pixels([[10, 1, 20, 255], [30, 2, 40, 255], [50, 3, 60, 255]], 3);
+  chromatic(s0, { offset: 2, strength: 0 });
+  assert.deepEqual([...s0.data], [10, 1, 20, 255, 30, 2, 40, 255, 50, 3, 60, 255]);
+});
+
+test("drama at zero strength is neutral and preserves alpha", () => {
+  const image = pixels([[90, 140, 210, 73]]);
+  drama(image, { style: "Cinematic", strength: 0, shadows: 0, highlights: 0, saturation: 100 });
+  assert.deepEqual([...image.data], [90, 140, 210, 73]);
+});
+
+test("drama looks produce distinct controlled tone mappings", () => {
+  const source = [70, 130, 205, 111];
+  const cinematic = pixels([source]);
+  const noir = pixels([source]);
+  drama(cinematic, { style: "Cinematic", strength: 100, shadows: 0, highlights: 0, saturation: 100 });
+  drama(noir, { style: "Noir", strength: 100, shadows: 0, highlights: 0, saturation: 100 });
+  assert.equal(cinematic.data[3], 111);
+  assert.equal(noir.data[3], 111);
+  assert.deepEqual([...cinematic.data.slice(0, 3)], [61, 137, 213]);
+  assert.deepEqual([...noir.data.slice(0, 3)], [120, 120, 120]);
+});
+
+test("drama shadow and highlight controls move the intended tonal ranges", () => {
+  const lifted = pixels([[30, 30, 30, 255], [225, 225, 225, 255]], 2);
+  const crushed = pixels([[30, 30, 30, 255], [225, 225, 225, 255]], 2);
+  drama(lifted, { style: "Portrait", strength: 100, shadows: 50, highlights: 50, saturation: 100 });
+  drama(crushed, { style: "Portrait", strength: 100, shadows: -50, highlights: -50, saturation: 100 });
+  assert.ok(lifted.data[0] > crushed.data[0]);
+  assert.ok(lifted.data[4] > crushed.data[4]);
+});
+
+test("dramaSettings builds three 17-point tables and is deterministic", () => {
+  const params = { style: "Storm", strength: 75, shadows: -10, highlights: -15, saturation: 90 };
+  assert.deepEqual(dramaSettings(params), dramaSettings(params));
+  assert.equal(dramaSettings(params).tables[0].length, 17);
+});
+
+test("dramaSettings is case-insensitive and falls back to cinematic", () => {
+  const a = dramaSettings({ style: "CINEMATIC", strength: 50, shadows: 0, highlights: 0, saturation: 100 });
+  const b = dramaSettings({ style: "cinematic", strength: 50, shadows: 0, highlights: 0, saturation: 100 });
+  const c = dramaSettings({ style: "Nonsense", strength: 50, shadows: 0, highlights: 0, saturation: 100 });
+  assert.deepEqual(a, b);
+  assert.deepEqual(a, c);
+});
+
+test("mapPixelColor interpolates between stops", () => {
+  const mapped = mapPixelColor(0.5, [[0, 0, 0], [255, 255, 255]]);
+  assert.deepEqual(mapped, [128, 128, 128]);
+});
+
+test("custom effects are order-sensitive", () => {
+  const source = [90, 140, 210, 255];
+  const first = pixels([source]);
+  posterize(first, { steps: 3 });
+  duotone(first, { shadow: "#102030", highlight: "#e0a060", contrast: 0 });
+  const second = pixels([source]);
+  duotone(second, { shadow: "#102030", highlight: "#e0a060", contrast: 0 });
+  posterize(second, { steps: 3 });
+  assert.notDeepEqual([...first.data], [...second.data]);
+});
+
+test("drama remains order-sensitive with other tone effects", () => {
+  const params = { style: "Bleach", strength: 85, shadows: -10, highlights: 15, saturation: 80 };
+  const first = pixels([[90, 140, 210, 255]]);
+  drama(first, params);
+  posterize(first, { steps: 4 });
+  const second = pixels([[90, 140, 210, 255]]);
+  posterize(second, { steps: 4 });
+  drama(second, params);
+  assert.notDeepEqual([...first.data], [...second.data]);
+});
+
+test("registry wires apply for the tone effects", () => {
+  for (const type of ["duotone", "tritone", "posterize", "heatmap", "drama", "chromatic"]) {
+    assert.equal(typeof EFFECTS[type].apply, "function", `${type} missing apply`);
+  }
+});
