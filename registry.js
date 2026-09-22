@@ -17,6 +17,7 @@ import * as tone from "./effects/tone.js";
 import * as blurFx from "./effects/blur.js";
 import * as overlayFx from "./effects/overlay.js";
 import * as grainFx from "./effects/grain.js";
+import * as glitchFx from "./effects/glitch.js";
 
 const num = (min, max, def, opts = {}) => ({ kind: "number", min, max, default: def, ...opts });
 const sel = (options, def) => ({ kind: "select", options, default: def });
@@ -168,6 +169,7 @@ export const EFFECTS = {
   },
   glitch: {
     category: "procedural",
+    apply: glitchFx.glitch,
     params: {
       style: sel(["CCD Failure", "VHS Tear", "RGB Fracture", "Signal Loss"], "CCD Failure"),
       amount: num(0, 100, 42, { unit: "%" }),
