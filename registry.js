@@ -14,6 +14,7 @@
 import { BLEND_MODES } from "./color.js";
 import * as pointwise from "./effects/pointwise.js";
 import * as tone from "./effects/tone.js";
+import * as blurFx from "./effects/blur.js";
 
 const num = (min, max, def, opts = {}) => ({ kind: "number", min, max, default: def, ...opts });
 const sel = (options, def) => ({ kind: "select", options, default: def });
@@ -31,7 +32,7 @@ export const EFFECTS = {
   opacity: { category: "pointwise", apply: pointwise.opacity, params: { v: num(0, 100, 80, { unit: "%" }) } },
 
   /* ---- neighbourhood ---- */
-  blur: { category: "neighbourhood", params: { v: num(0, 20, 1, { unit: "px", px: true }) } },
+  blur: { category: "neighbourhood", apply: blurFx.blur, params: { v: num(0, 20, 1, { unit: "px", px: true }) } },
 
   /* ---- tone ---- */
   duotone: {
