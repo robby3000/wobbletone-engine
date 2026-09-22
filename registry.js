@@ -18,6 +18,7 @@ import * as blurFx from "./effects/blur.js";
 import * as overlayFx from "./effects/overlay.js";
 import * as grainFx from "./effects/grain.js";
 import * as glitchFx from "./effects/glitch.js";
+import * as bloomFx from "./effects/bloom.js";
 
 const num = (min, max, def, opts = {}) => ({ kind: "number", min, max, default: def, ...opts });
 const sel = (options, def) => ({ kind: "select", options, default: def });
@@ -65,6 +66,7 @@ export const EFFECTS = {
   /* ---- composite ---- */
   bloom: {
     category: "composite",
+    apply: bloomFx.bloom,
     params: {
       blur: num(0, 60, 12, { unit: "px", px: true }),
       threshold: num(50, 400, 140, { unit: "%" }),
