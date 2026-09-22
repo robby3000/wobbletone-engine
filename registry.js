@@ -19,6 +19,8 @@ import * as overlayFx from "./effects/overlay.js";
 import * as grainFx from "./effects/grain.js";
 import * as glitchFx from "./effects/glitch.js";
 import * as bloomFx from "./effects/bloom.js";
+import * as dropshadowFx from "./effects/dropshadow.js";
+import * as compoundFx from "./effects/compound.js";
 
 const num = (min, max, def, opts = {}) => ({ kind: "number", min, max, default: def, ...opts });
 const sel = (options, def) => ({ kind: "select", options, default: def });
@@ -85,6 +87,7 @@ export const EFFECTS = {
   },
   dropshadow: {
     category: "composite",
+    apply: dropshadowFx.dropshadow,
     params: {
       x: num(-30, 30, 0, { unit: "px", px: true }),
       y: num(-30, 30, 8, { unit: "px", px: true }),
@@ -184,6 +187,7 @@ export const EFFECTS = {
   /* ---- compound ---- */
   psychedelic: {
     category: "compound",
+    apply: compoundFx.psychedelic,
     params: {
       saturate: num(100, 500, 280, { unit: "%" }),
       contrast: num(80, 200, 130, { unit: "%" }),
@@ -191,9 +195,14 @@ export const EFFECTS = {
       animate: sel(["yes", "no"], "yes"),
     },
   },
-  infrared: { category: "compound", params: { intensity: num(0, 100, 70, { unit: "%" }) } },
+  infrared: {
+    category: "compound",
+    apply: compoundFx.infrared,
+    params: { intensity: num(0, 100, 70, { unit: "%" }) },
+  },
   vintage: {
     category: "compound",
+    apply: compoundFx.vintage,
     params: {
       sepia: num(0, 100, 45, { unit: "%" }),
       contrast: num(60, 140, 95, { unit: "%" }),
