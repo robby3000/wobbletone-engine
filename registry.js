@@ -16,6 +16,7 @@ import * as pointwise from "./effects/pointwise.js";
 import * as tone from "./effects/tone.js";
 import * as blurFx from "./effects/blur.js";
 import * as overlayFx from "./effects/overlay.js";
+import * as grainFx from "./effects/grain.js";
 
 const num = (min, max, def, opts = {}) => ({ kind: "number", min, max, default: def, ...opts });
 const sel = (options, def) => ({ kind: "select", options, default: def });
@@ -157,6 +158,7 @@ export const EFFECTS = {
   /* ---- procedural ---- */
   grain: {
     category: "procedural",
+    apply: grainFx.grain,
     params: {
       size: num(0.3, 3, 0.9, { px: true }),
       opacity: num(0, 100, 25, { unit: "%" }),
