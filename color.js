@@ -26,6 +26,37 @@ export const rgb01 = (hex) => hexToRgb(hex).map((v) => v / 255);
 // 0–1 floats, the result is in the same units.
 export const luminance = (r, g, b) => 0.3 * r + 0.59 * g + 0.11 * b;
 
+// Minimal css-color parser for spec stop colours:
+// "transparent", "#rgb", "#rrggbb", "rgb(r,g,b)", "rgba(r,g,b,a)".
+// Returns [r,g,b,a] bytes. Throws on anything else — fail clearly.
+export function parseCssColor(str) {
+  const s = String(str).trim().toLowerCase();
+  if (s === "transparent") return [0, 0, 0, 0];
+  if (s.startsWith("#")) {
+    const [r, g, b] = hexToRgb(s);
+    if ([r, g, b].some(Number.isNaN)) throw new Error(`bad hex color "${str}"`);
+    return [r, g, b, 255];
+  }
+  const m = s.match(/^rgba?\(([^)]+)\)$/);
+  if (m) {
+    const parts = m[1].split(",").map((p) => p.trim());
+    if (parts.length < 3 || parts.length > 4) throw new Error(`bad color "${str}"`);
+    const channels = parts.slice(0, 3).map((p) => {
+      if (p.endsWith("%")) return clamp(Number(p.slice(0, -1)) * 2.55, 0, 255);
+      return clamp(Number(p), 0, 255);
+    });
+    if (channels.some(Number.isNaN)) throw new Error(`bad color "${str}"`);
+    let a = 255;
+    if (parts.length === 4) {
+      const raw = parts[3];
+      a = raw.endsWith("%") ? clamp(Number(raw.slice(0, -1)) * 2.55, 0, 255) : clamp(Number(raw) * 255, 0, 255);
+      if (Number.isNaN(a)) throw new Error(`bad color "${str}"`);
+    }
+    return [Math.round(channels[0]), Math.round(channels[1]), Math.round(channels[2]), Math.round(a)];
+  }
+  throw new Error(`unsupported color "${str}"`);
+}
+
 /* ---------- W3C Compositing & Blending Level 1 ---------- */
 
 const softLightD = (x) => (x <= 0.25 ? ((16 * x - 12) * x + 4) * x : Math.sqrt(x));

@@ -15,6 +15,7 @@ import { BLEND_MODES } from "./color.js";
 import * as pointwise from "./effects/pointwise.js";
 import * as tone from "./effects/tone.js";
 import * as blurFx from "./effects/blur.js";
+import * as overlayFx from "./effects/overlay.js";
 
 const num = (min, max, def, opts = {}) => ({ kind: "number", min, max, default: def, ...opts });
 const sel = (options, def) => ({ kind: "select", options, default: def });
@@ -91,6 +92,7 @@ export const EFFECTS = {
   /* ---- overlay ---- */
   colorwash: {
     category: "overlay",
+    apply: overlayFx.colorwash,
     params: {
       color: col("#7c5cff"),
       blend: sel(
@@ -102,6 +104,7 @@ export const EFFECTS = {
   },
   gradient: {
     category: "overlay",
+    apply: overlayFx.gradient,
     params: {
       c1: col("#ff5c8a"),
       c2: col("#7c5cff"),
@@ -115,6 +118,7 @@ export const EFFECTS = {
   },
   overlay: {
     category: "overlay",
+    apply: overlayFx.overlay,
     params: {
       kind: sel(["linear", "radial"], "linear"),
       stops: { kind: "stops", default: [[0, "#000000"], [1, "#ffffff"]] },
@@ -125,10 +129,12 @@ export const EFFECTS = {
   },
   vignette: {
     category: "overlay",
+    apply: overlayFx.vignette,
     params: { color: col("#000000"), size: num(20, 100, 60, { unit: "%" }), opacity: num(0, 100, 50, { unit: "%" }) },
   },
   scanlines: {
     category: "overlay",
+    apply: overlayFx.scanlines,
     params: {
       size: num(1, 8, 3, { unit: "px", px: true }),
       color: col("#000000"),
@@ -138,6 +144,7 @@ export const EFFECTS = {
   },
   prism: {
     category: "overlay",
+    apply: overlayFx.prism,
     params: {
       c1: col("#ff2e88"),
       c2: col("#2effd5"),
