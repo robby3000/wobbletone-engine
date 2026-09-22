@@ -1,4 +1,11 @@
-// Colour primitives. Blend modes and compositing land here in E5.
+// Colour primitives. Blend-mode implementations land here in E5.
+
+// All 15 W3C Compositing & Blending Level 1 modes.
+export const BLEND_MODES = [
+  "normal", "multiply", "screen", "overlay", "darken", "lighten",
+  "color-dodge", "color-burn", "hard-light", "soft-light",
+  "difference", "exclusion", "hue", "saturation", "color", "luminosity",
+];
 
 export const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
