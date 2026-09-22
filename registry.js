@@ -12,6 +12,7 @@
 // multiplies them by renderScale before dispatch.
 
 import { BLEND_MODES } from "./color.js";
+import * as pointwise from "./effects/pointwise.js";
 
 const num = (min, max, def, opts = {}) => ({ kind: "number", min, max, default: def, ...opts });
 const sel = (options, def) => ({ kind: "select", options, default: def });
@@ -19,14 +20,14 @@ const col = (def) => ({ kind: "color", default: def });
 
 export const EFFECTS = {
   /* ---- pointwise ---- */
-  brightness: { category: "pointwise", params: { v: num(0, 200, 110, { unit: "%" }) } },
-  contrast: { category: "pointwise", params: { v: num(0, 200, 110, { unit: "%" }) } },
-  saturate: { category: "pointwise", params: { v: num(0, 300, 120, { unit: "%" }) } },
-  hue: { category: "pointwise", params: { v: num(0, 360, 0, { unit: "°" }) } },
-  sepia: { category: "pointwise", params: { v: num(0, 100, 60, { unit: "%" }) } },
-  grayscale: { category: "pointwise", params: { v: num(0, 100, 100, { unit: "%" }) } },
-  invert: { category: "pointwise", params: { v: num(0, 100, 100, { unit: "%" }) } },
-  opacity: { category: "pointwise", params: { v: num(0, 100, 80, { unit: "%" }) } },
+  brightness: { category: "pointwise", apply: pointwise.brightness, params: { v: num(0, 200, 110, { unit: "%" }) } },
+  contrast: { category: "pointwise", apply: pointwise.contrast, params: { v: num(0, 200, 110, { unit: "%" }) } },
+  saturate: { category: "pointwise", apply: pointwise.saturate, params: { v: num(0, 300, 120, { unit: "%" }) } },
+  hue: { category: "pointwise", apply: pointwise.hue, params: { v: num(0, 360, 0, { unit: "°" }) } },
+  sepia: { category: "pointwise", apply: pointwise.sepia, params: { v: num(0, 100, 60, { unit: "%" }) } },
+  grayscale: { category: "pointwise", apply: pointwise.grayscale, params: { v: num(0, 100, 100, { unit: "%" }) } },
+  invert: { category: "pointwise", apply: pointwise.invert, params: { v: num(0, 100, 100, { unit: "%" }) } },
+  opacity: { category: "pointwise", apply: pointwise.opacity, params: { v: num(0, 100, 80, { unit: "%" }) } },
 
   /* ---- neighbourhood ---- */
   blur: { category: "neighbourhood", params: { v: num(0, 20, 1, { unit: "px", px: true }) } },
