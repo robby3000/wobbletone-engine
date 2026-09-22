@@ -1,0 +1,10 @@
+{
+  "name": "wobbletone-engine",
+  "version": "1.0.0",
+  "description": "Shared deterministic image-effects engine for WobbleTone FX and Aimless",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}
