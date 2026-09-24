@@ -5,7 +5,7 @@
 // (The SVG builder functions are not ported — SVG is a removed render path,
 // not part of the semantic model.)
 
-import { clamp, lerpByte, hexToRgb } from "../color.js";
+import { clamp, lerpByte, hexToRgb, rgbToHsl, hslToRgb } from "../color.js";
 
 /* ---------- shared gradient-map machinery ---------- */
 
@@ -66,6 +66,48 @@ export function posterize(buffer, params) {
     data[i] = posterizeByte(data[i], steps);
     data[i + 1] = posterizeByte(data[i + 1], steps);
     data[i + 2] = posterizeByte(data[i + 2], steps);
+  }
+  return buffer;
+}
+
+/* ---------- solarize ---------- */
+
+// Classic darkroom solarization: tones above `threshold` invert
+// (v → 255 − v), mixed back toward the original by `amount`.
+export function solarize(buffer, params) {
+  const threshold = (params.threshold / 100) * 255;
+  const mix = params.amount / 100;
+  const data = buffer.data;
+  for (let i = 0; i < data.length; i += 4) {
+    for (let c = 0; c < 3; c++) {
+      const v = data[i + c];
+      const s = v <= threshold ? v : 255 - v;
+      data[i + c] = clamp(Math.round(v + (s - v) * mix), 0, 255);
+    }
+  }
+  return buffer;
+}
+
+/* ---------- hueband ---------- */
+
+// Hue quantization: snap each pixel's hue to the centre of one of `bands`
+// equal-width buckets, preserving saturation and lightness. `spread`
+// progressively rotates successive bands around the wheel — at 0 the bands
+// sit at their centres, higher values push neighbouring hues apart.
+export function hueband(buffer, params) {
+  const bands = Math.max(2, Math.round(params.bands));
+  const spread = params.spread / 100;
+  const seg = 360 / bands;
+  const data = buffer.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const [h, s, l] = rgbToHsl(data[i], data[i + 1], data[i + 2]);
+    if (s === 0) continue;
+    const band = Math.floor(h / seg);
+    const h2 = ((band + 0.5) * seg + band * spread * seg) % 360;
+    const [r, g, b] = hslToRgb(h2, s, l);
+    data[i] = r;
+    data[i + 1] = g;
+    data[i + 2] = b;
   }
   return buffer;
 }

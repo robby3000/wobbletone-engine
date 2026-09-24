@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { EFFECTS } from "../registry.js";
 import {
   duotone, tritone, posterize, posterizeByte, heatmap, drama, dramaSettings,
-  chromatic, mapPixelColor,
+  chromatic, mapPixelColor, solarize, hueband,
 } from "../effects/tone.js";
 
 // These cases are ported from wobbletonefx tests/pixel-effects.test.js —
@@ -164,7 +164,59 @@ test("drama remains order-sensitive with other tone effects", () => {
 });
 
 test("registry wires apply for the tone effects", () => {
-  for (const type of ["duotone", "tritone", "posterize", "heatmap", "drama", "chromatic"]) {
+  for (const type of ["duotone", "tritone", "posterize", "solarize", "hueband", "heatmap", "drama", "chromatic"]) {
     assert.equal(typeof EFFECTS[type].apply, "function", `${type} missing apply`);
   }
+});
+
+/* ---------- solarize ---------- */
+
+test("solarize at amount 0 is identity", () => {
+  const image = pixels([[60, 140, 230, 200]]);
+  solarize(image, { amount: 0, threshold: 50 });
+  assert.deepEqual([...image.data], [60, 140, 230, 200]);
+});
+
+test("solarize inverts tones above the threshold at full mix", () => {
+  const image = pixels([[200, 100, 255, 255]]);
+  // threshold 50% = 127.5: 200 → 55, 255 → 0, 100 stays
+  solarize(image, { amount: 100, threshold: 50 });
+  assert.deepEqual([...image.data], [55, 100, 0, 255]);
+});
+
+test("solarize partial amount lerps toward the inverted tone", () => {
+  const image = pixels([[200, 200, 200, 255]]);
+  solarize(image, { amount: 50, threshold: 50 });
+  // 200 → 55, half mix = 127.5 → 128
+  assert.deepEqual([...image.data], [128, 128, 128, 255]);
+});
+
+test("solarize preserves alpha", () => {
+  const image = pixels([[250, 250, 250, 77]]);
+  solarize(image, { amount: 100, threshold: 30 });
+  assert.equal(image.data[3], 77);
+});
+
+/* ---------- hueband ---------- */
+
+test("hueband snaps hue to band centres, preserving S and L", () => {
+  const image = pixels([[255, 0, 0, 255]]); // pure red, h=0 → band 0
+  hueband(image, { bands: 4, spread: 0 });
+  // bands=4 → 90° segments; red lands in band 0 whose centre is 45°
+  // hsl(45°, 1, 0.5) = (255, 191, 0)
+  assert.deepEqual([...image.data], [255, 191, 0, 255]);
+});
+
+test("hueband leaves achromatic pixels unchanged", () => {
+  const image = pixels([[128, 128, 128, 255], [0, 0, 0, 255]]);
+  hueband(image, { bands: 6, spread: 0 });
+  assert.deepEqual([...image.data], [128, 128, 128, 255, 0, 0, 0, 255]);
+});
+
+test("hueband spread rotates successive bands apart", () => {
+  // green h=120 → band 1 of 4; spread 100 adds band*seg = 90° to the 135° centre → 225°
+  const image = pixels([[0, 255, 0, 255]]);
+  hueband(image, { bands: 4, spread: 100 });
+  // hsl(225°, 1, 0.5) = (0, 64, 255)
+  assert.deepEqual([...image.data], [0, 64, 255, 255]);
 });

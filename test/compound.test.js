@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { makeBuffer } from "../buffer.js";
 import { infrared, vintage, psychedelic } from "../effects/compound.js";
 import { invert, hue, saturate, sepia, contrast, brightness } from "../effects/pointwise.js";
+import { solarize, hueband } from "../effects/tone.js";
 import { EFFECTS } from "../registry.js";
 
 const filled = (rgba, w, h) => {
@@ -51,10 +52,22 @@ test("vintage equals sepia → contrast → saturate → brightness manually", (
   assert.deepEqual([...b.data], [...expected.data]);
 });
 
-test("psychedelic equals saturate → contrast manually (hue-rotate(0) is identity)", () => {
+test("psychedelic with bands/solarize off equals saturate → contrast manually", () => {
   const expected = manual([[saturate, 280], [contrast, 130]], [30, 200, 120, 255]);
   const b = filled([30, 200, 120, 255], 4, 4);
-  psychedelic(b, { saturate: 280, contrast: 130, speed: 8, animate: "yes" });
+  psychedelic(b, { saturate: 280, contrast: 130, bands: 0, solarize: 0 });
+  assert.deepEqual([...b.data], [...expected.data]);
+});
+
+test("psychedelic full recipe equals saturate → contrast → solarize → hueband", () => {
+  const params = { saturate: 280, contrast: 130, bands: 6, solarize: 50 };
+  const expected = filled([30, 200, 120, 255], 4, 4);
+  saturate(expected, { v: 280 });
+  contrast(expected, { v: 130 });
+  solarize(expected, { amount: 50, threshold: 50 });
+  hueband(expected, { bands: 6, spread: 0 });
+  const b = filled([30, 200, 120, 255], 4, 4);
+  psychedelic(b, params);
   assert.deepEqual([...b.data], [...expected.data]);
 });
 
@@ -68,7 +81,7 @@ test("registry wires apply for all three compounds", () => {
   for (const [type, params] of [
     ["infrared", { intensity: 70 }],
     ["vintage", { sepia: 45, contrast: 95, saturate: 80, brightness: 105 }],
-    ["psychedelic", { saturate: 280, contrast: 130, speed: 8, animate: "yes" }],
+    ["psychedelic", { saturate: 280, contrast: 130, bands: 6, solarize: 50 }],
   ]) {
     const b = filled([120, 60, 200, 255], 4, 4);
     const before = [...b.data];

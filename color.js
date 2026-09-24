@@ -26,6 +26,41 @@ export const rgb01 = (hex) => hexToRgb(hex).map((v) => v / 255);
 // 0–1 floats, the result is in the same units.
 export const luminance = (r, g, b) => 0.3 * r + 0.59 * g + 0.11 * b;
 
+/* ---------- HSL conversion (byte channels, hue in degrees) ---------- */
+
+// [r,g,b] bytes → [h(0–360), s(0–1), l(0–1)]. Achromatic pixels get h=0,s=0.
+export function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const d = max - min;
+  const l = (max + min) / 2;
+  if (d === 0) return [0, 0, l];
+  const s = d / (1 - Math.abs(2 * l - 1));
+  let h;
+  if (max === r) h = ((g - b) / d) % 6;
+  else if (max === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  h *= 60;
+  return [h < 0 ? h + 360 : h, s, l];
+}
+
+// [h(0–360), s(0–1), l(0–1)] → [r,g,b] bytes.
+export function hslToRgb(h, s, l) {
+  h = ((h % 360) + 360) % 360;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+  const m = l - c / 2;
+  const rgb =
+    h < 60 ? [c, x, 0] :
+    h < 120 ? [x, c, 0] :
+    h < 180 ? [0, c, x] :
+    h < 240 ? [0, x, c] :
+    h < 300 ? [x, 0, c] :
+    [c, 0, x];
+  return rgb.map((v) => clamp(Math.round((v + m) * 255), 0, 255));
+}
+
 // Minimal css-color parser for spec stop colours:
 // "transparent", "#rgb", "#rrggbb", "rgb(r,g,b)", "rgba(r,g,b,a)".
 // Returns [r,g,b,a] bytes. Throws on anything else — fail clearly.

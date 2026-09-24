@@ -109,7 +109,9 @@ export const CASES = [
   ["glitch", "checker", [{ type: "glitch", params: { style: "VHS Tear", amount: 55, bandSize: 25, split: 5, seed: 99 } }]],
   ["infrared", "portrait", [{ type: "infrared", params: { intensity: 75 } }]],
   ["vintage", "portrait", [{ type: "vintage", params: { sepia: 50, contrast: 90, saturate: 85, brightness: 108 } }]],
-  ["psychedelic", "gradient", [{ type: "psychedelic", params: { saturate: 300, contrast: 140, speed: 6, animate: "no" } }]],
+  ["psychedelic", "gradient", [{ type: "psychedelic", params: { saturate: 300, contrast: 140, bands: 8, solarize: 60 } }]],
+  ["solarize", "portrait", [{ type: "solarize", params: { amount: 80, threshold: 45 } }]],
+  ["hueband", "gradient", [{ type: "hueband", params: { bands: 5, spread: 30 } }]],
 
   /* ---- multi-effect stacks ---- */
   ["stack-film", "portrait", [

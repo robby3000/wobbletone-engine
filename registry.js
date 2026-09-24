@@ -52,6 +52,16 @@ export const EFFECTS = {
     params: { shadow: col("#0b1d3a"), mid: col("#c44d4d"), highlight: col("#ffe8a3") },
   },
   posterize: { category: "tone", apply: tone.posterize, params: { steps: num(2, 16, 5) } },
+  solarize: {
+    category: "tone",
+    apply: tone.solarize,
+    params: { amount: num(0, 100, 60, { unit: "%" }), threshold: num(0, 100, 50, { unit: "%" }) },
+  },
+  hueband: {
+    category: "tone",
+    apply: tone.hueband,
+    params: { bands: num(2, 16, 6), spread: num(0, 100, 0, { unit: "%" }) },
+  },
   heatmap: { category: "tone", apply: tone.heatmap, params: { intensity: num(0, 100, 100, { unit: "%" }) } },
   drama: {
     category: "tone",
@@ -191,8 +201,8 @@ export const EFFECTS = {
     params: {
       saturate: num(100, 500, 280, { unit: "%" }),
       contrast: num(80, 200, 130, { unit: "%" }),
-      speed: num(0, 20, 8, { unit: "s" }),
-      animate: sel(["yes", "no"], "yes"),
+      bands: num(0, 16, 6),
+      solarize: num(0, 100, 50, { unit: "%" }),
     },
   },
   infrared: {

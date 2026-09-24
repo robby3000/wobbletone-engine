@@ -6,7 +6,7 @@ import { BLEND_MODES } from "../color.js";
 const EXPECTED_TYPES = [
   "brightness", "contrast", "saturate", "hue", "sepia", "grayscale", "invert", "opacity",
   "blur",
-  "duotone", "tritone", "posterize", "heatmap", "drama",
+  "duotone", "tritone", "posterize", "solarize", "hueband", "heatmap", "drama",
   "bloom", "chromatic", "dropshadow",
   "colorwash", "gradient", "overlay", "vignette", "scanlines", "prism",
   "grain", "glitch",
