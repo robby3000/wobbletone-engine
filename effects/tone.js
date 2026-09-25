@@ -6,6 +6,8 @@
 // not part of the semantic model.)
 
 import { clamp, lerpByte, hexToRgb, rgbToHsl, hslToRgb } from "../color.js";
+import { gaussianBlur } from "./blur.js";
+import { cloneBuffer } from "../buffer.js";
 
 /* ---------- shared gradient-map machinery ---------- */
 
@@ -114,12 +116,33 @@ export function hueband(buffer, params) {
 
 /* ---------- drama ---------- */
 
+// Per-look recipe, all interpolated by `strength`:
+//   curve      5-point luminance LUT anchors (toe → shoulder)
+//   saturation chroma multiplier at full strength
+//   clarity    unsharp-mask amount: + = microcontrast, − = softening
+//   glow       screen-blend of the blurred copy (halation)
+//   shadow / highlight  per-channel grade ramps across the tone range
 const DRAMA_LOOKS = {
-  cinematic: { curve: [0, 0.18, 0.52, 0.82, 1], saturation: 0.9, shadow: [-0.015, 0.002, 0.025], highlight: [0.028, 0.012, -0.01] },
-  noir: { curve: [0, 0.11, 0.5, 0.9, 1], saturation: 0, shadow: [0, 0, 0], highlight: [0, 0, 0] },
-  bleach: { curve: [0.035, 0.19, 0.53, 0.86, 0.99], saturation: 0.38, shadow: [-0.01, 0, 0.012], highlight: [0.024, 0.018, 0] },
-  storm: { curve: [0, 0.14, 0.46, 0.76, 0.94], saturation: 0.72, shadow: [-0.015, 0.004, 0.04], highlight: [-0.006, 0.004, 0.022] },
-  portrait: { curve: [0.018, 0.23, 0.51, 0.79, 0.985], saturation: 0.95, shadow: [0, 0, 0.006], highlight: [0.032, 0.014, -0.006] },
+  cinematic: {
+    curve: [0, 0.14, 0.5, 0.87, 0.985], saturation: 0.8, clarity: 0.2, glow: 0,
+    shadow: [-0.02, 0.005, 0.05], highlight: [0.05, 0.022, -0.02],
+  },
+  noir: {
+    curve: [0.005, 0.08, 0.45, 0.93, 1], saturation: 0, clarity: 0.6, glow: 0,
+    shadow: [0, 0.002, 0.01], highlight: [0.005, 0.005, 0.005],
+  },
+  bleach: {
+    curve: [0.015, 0.14, 0.44, 0.9, 1], saturation: 0.4, clarity: 0.5, glow: 0,
+    shadow: [-0.012, 0, 0.018], highlight: [0.028, 0.022, 0],
+  },
+  storm: {
+    curve: [0, 0.11, 0.42, 0.7, 0.88], saturation: 0.55, clarity: 0.4, glow: 0,
+    shadow: [-0.02, 0.005, 0.06], highlight: [-0.008, 0.008, 0.035],
+  },
+  portrait: {
+    curve: [0.05, 0.24, 0.52, 0.78, 0.96], saturation: 0.92, clarity: -0.35, glow: 0.22,
+    shadow: [0.02, 0.006, -0.012], highlight: [0.05, 0.02, -0.022],
+  },
 };
 
 export function dramaSettings(params) {
@@ -145,7 +168,7 @@ export function dramaSettings(params) {
       return value;
     });
   });
-  return { saturation, tables };
+  return { saturation, tables, clarity: look.clarity * strength, glow: look.glow * strength };
 }
 
 function sampleDramaTable(value, table) {
@@ -155,14 +178,42 @@ function sampleDramaTable(value, table) {
   return Math.round((table[lower] + (table[upper] - table[lower]) * (position - lower)) * 255);
 }
 
+// Spatial stage first (clarity unsharp + glow halation on a blurred copy),
+// then the pointwise grade: saturation around luminance, per-channel LUT.
+// Blur radius is resolution-relative so preview and export stay matched.
 export function drama(buffer, params) {
-  const { saturation, tables } = dramaSettings(params);
+  const { saturation, tables, clarity, glow } = dramaSettings(params);
   const data = buffer.data;
+  let soft = null;
+  if (Math.abs(clarity) > 0.001 || glow > 0.001) {
+    soft = gaussianBlur(cloneBuffer(buffer), Math.min(buffer.width, buffer.height) / 320);
+  }
   for (let i = 0; i < data.length; i += 4) {
-    const luminance = 0.213 * data[i] + 0.715 * data[i + 1] + 0.072 * data[i + 2];
-    const red = clamp(luminance + (data[i] - luminance) * saturation, 0, 255);
-    const green = clamp(luminance + (data[i + 1] - luminance) * saturation, 0, 255);
-    const blue = clamp(luminance + (data[i + 2] - luminance) * saturation, 0, 255);
+    let r = data[i], g = data[i + 1], b = data[i + 2];
+    if (soft) {
+      const sr = soft.data[i], sg = soft.data[i + 1], sb = soft.data[i + 2];
+      if (clarity > 0) {
+        r += (r - sr) * clarity;
+        g += (g - sg) * clarity;
+        b += (b - sb) * clarity;
+      } else if (clarity < 0) {
+        r += (sr - r) * -clarity;
+        g += (sg - g) * -clarity;
+        b += (sb - b) * -clarity;
+      }
+      if (glow > 0) {
+        r += (255 - (255 - r) * (255 - sr) / 255 - r) * glow;
+        g += (255 - (255 - g) * (255 - sg) / 255 - g) * glow;
+        b += (255 - (255 - b) * (255 - sb) / 255 - b) * glow;
+      }
+      r = clamp(Math.round(r), 0, 255);
+      g = clamp(Math.round(g), 0, 255);
+      b = clamp(Math.round(b), 0, 255);
+    }
+    const luminance = 0.213 * r + 0.715 * g + 0.072 * b;
+    const red = clamp(luminance + (r - luminance) * saturation, 0, 255);
+    const green = clamp(luminance + (g - luminance) * saturation, 0, 255);
+    const blue = clamp(luminance + (b - luminance) * saturation, 0, 255);
     data[i] = sampleDramaTable(red, tables[0]);
     data[i + 1] = sampleDramaTable(green, tables[1]);
     data[i + 2] = sampleDramaTable(blue, tables[2]);

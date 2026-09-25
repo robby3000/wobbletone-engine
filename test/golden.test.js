@@ -22,7 +22,7 @@ const EXPECTED = {
   "tritone": "7ee8c19e",
   "posterize": "bb26b925",
   "heatmap": "64249c1f",
-  "drama": "23b709ed",
+  "drama": "ab4b7291",
   "chromatic": "38ec18c5",
   "bloom": "b3fb5d15",
   "dropshadow": "e6664d18",
@@ -44,7 +44,7 @@ const EXPECTED = {
   "stack-signal": "45ebb295",
   "stack-print": "75a83739",
   "stack-dream": "27342a91",
-  "stack-drama": "3f737dba",
+  "stack-drama": "7891f42a",
 };
 
 for (const [name, fixture, effects] of CASES) {

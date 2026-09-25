@@ -109,8 +109,32 @@ test("drama looks produce distinct controlled tone mappings", () => {
   drama(noir, { style: "Noir", strength: 100, shadows: 0, highlights: 0, saturation: 100 });
   assert.equal(cinematic.data[3], 111);
   assert.equal(noir.data[3], 111);
-  assert.deepEqual([...cinematic.data.slice(0, 3)], [61, 137, 213]);
-  assert.deepEqual([...noir.data.slice(0, 3)], [120, 120, 120]);
+  assert.deepEqual([...cinematic.data.slice(0, 3)], [60, 132, 217]);
+  assert.deepEqual([...noir.data.slice(0, 3)], [108, 108, 109]);
+});
+
+test("dramaSettings scales clarity and glow with strength", () => {
+  const noir = dramaSettings({ style: "Noir", strength: 100, shadows: 0, highlights: 0, saturation: 100 });
+  const portrait = dramaSettings({ style: "Portrait", strength: 100, shadows: 0, highlights: 0, saturation: 100 });
+  const off = dramaSettings({ style: "Noir", strength: 0, shadows: 0, highlights: 0, saturation: 100 });
+  assert.ok(noir.clarity > 0);
+  assert.ok(portrait.clarity < 0 && portrait.glow > 0);
+  assert.equal(off.clarity, 0);
+  assert.equal(off.glow, 0);
+});
+
+test("drama clarity increases local contrast across a step edge", () => {
+  // Blur radius is resolution-relative, so the image needs real extent.
+  const W = 200, H = 200;
+  const px = [];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) px.push(x < W / 2 ? [100, 100, 100, 255] : [160, 160, 160, 255]);
+  const noir = pixels(px, W);
+  drama(noir, { style: "Noir", strength: 100, shadows: 0, highlights: 0, saturation: 100 });
+  const at = (x, y) => noir.data[(y * W + x) * 4];
+  // Unsharp masking pushes the dark side darker and the bright side brighter
+  // near the edge, relative to flat-region pixels remapped by the LUT alone.
+  assert.ok(at(99, 100) < at(10, 100));
+  assert.ok(at(100, 100) > at(190, 100));
 });
 
 test("drama shadow and highlight controls move the intended tonal ranges", () => {
