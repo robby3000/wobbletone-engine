@@ -190,6 +190,7 @@ export const EFFECTS = {
       amount: num(0, 100, 42, { unit: "%" }),
       bandSize: num(1, 100, 28, { unit: "%" }),
       split: num(0, 30, 6, { unit: "px", px: true }),
+      corrupt: num(0, 100, 40, { unit: "%" }),
       seed: num(1, 9999, 317),
     },
   },

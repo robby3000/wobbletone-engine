@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { makeBuffer } from "../buffer.js";
 import { glitch, buildGlitchBands, glitchSettings, GLITCH_PROFILES } from "../effects/glitch.js";
+import { seededRandom } from "../rng.js";
 import { EFFECTS } from "../registry.js";
 
 const filled = (rgba, w, h) => {
@@ -65,6 +66,24 @@ test("amount 0 yields only inactive bands (dx=dy=0, exposure=1)", () => {
   }
 });
 
+test("corrupt 0 leaves bands uncorrupted; corrupt > 0 produces corrupt bands", () => {
+  const clean = buildGlitchBands({ ...PARAMS, corrupt: 0 }, 64, 48).bands;
+  assert.ok(clean.every((b) => b.corrupt === null));
+  const dirty = buildGlitchBands({ ...PARAMS, corrupt: 100, amount: 100 }, 64, 48).bands;
+  assert.ok(dirty.some((b) => b.corrupt !== null), "expected at least one corrupted band");
+});
+
+test("active bands can carry jitter, repeat, and per-band split", () => {
+  const { bands } = buildGlitchBands({ ...PARAMS, amount: 100, corrupt: 0 }, 64, 48);
+  const active = bands.filter((b) => b.dx !== 0 || b.jitter > 0 || b.repeat);
+  assert.ok(active.length > 0, "expected active bands");
+  for (const b of active) {
+    assert.ok(b.jitter >= 0);
+    if (b.split !== null) assert.notEqual(b.split, 0);
+    if (b.corrupt) assert.ok(b.corrupt.severity > 0 && b.corrupt.severity <= 1);
+  }
+});
+
 /* ---------- glitch ---------- */
 
 test("glitch is deterministic for a seed", () => {
@@ -83,22 +102,28 @@ test("amount 0 is identity", () => {
 });
 
 test("glitch displaces a marker stripe horizontally within a band", () => {
-  // White column on black; output x reads sourceX = x − dx, so a stripe at
-  // column m appears at output column m + dx (rows: stripe spans all rows so
-  // dy can't move the content out of view).
+  // White column on black; output x reads sourceX = x − rowDx, so a stripe at
+  // column m appears at output column m + rowDx. rowDx = band.dx + per-row
+  // jitter (horizontal-clock noise, seeded by rowSeed and y).
   const params = { ...PARAMS, seed: 42 };
   const b = filled([0, 0, 0, 255], 32, 32);
   for (let y = 0; y < 32; y++) {
     const i = (y * 32 + 16) * 4;
     b.data[i] = b.data[i + 1] = b.data[i + 2] = 255;
   }
-  const { bands } = buildGlitchBands(params, 32, 32);
-  const band = bands.find((bd) => bd.dx !== 0 && bd.dx > -8 && bd.dx < 8);
-  assert.ok(band, "expected an active band with a small nonzero dx");
+  const { bands, rowSeed } = buildGlitchBands(params, 32, 32);
+  const rowDx = (band, y) => band.dx + (band.jitter
+    ? Math.round((seededRandom((rowSeed + Math.imul(y, 2654435761)) | 0)() * 2 - 1) * band.jitter)
+    : 0);
+  const band = bands.find((bd) => {
+    const dx = rowDx(bd, bd.y);
+    return dx !== 0 && 16 + dx >= 0 && 16 + dx < 32;
+  });
+  assert.ok(band, "expected an active band whose rowDx keeps the stripe in frame");
   glitch(b, params);
-  const nx = 16 + band.dx;
+  const nx = 16 + rowDx(band, band.y);
   const moved = (band.y * 32 + nx) * 4;
-  assert.ok(b.data[moved + 1] > 0, `stripe not found at output x=${nx} (dx=${band.dx})`);
+  assert.ok(b.data[moved + 1] > 0, `stripe not found at output x=${nx} (rowDx=${rowDx(band, band.y)})`);
 });
 
 test("channel split ghosts red right and blue left around a stripe", () => {
