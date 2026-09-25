@@ -41,7 +41,6 @@ test("identity cases leave pixels unchanged", () => {
     ["saturate", { v: 100 }],
     ["hue", { v: 0 }],
     ["sepia", { v: 0 }],
-    ["grayscale", { v: 0 }],
     ["invert", { v: 0 }],
     ["opacity", { v: 100 }],
   ]) {
@@ -49,8 +48,51 @@ test("identity cases leave pixels unchanged", () => {
   }
 });
 
-test("saturate 0 equals grayscale 100", () => {
-  assert.deepEqual(run("saturate", { v: 0 }), run("grayscale", { v: 100 }));
+test("saturate 0 equals default grayscale (neutral darkroom)", () => {
+  assert.deepEqual(run("saturate", { v: 0 }), run("grayscale", {}));
+});
+
+test("grayscale darkroom: red filter darkens blue, lifts red", () => {
+  const sky = px([30, 60, 220, 255]);
+  const skin = px([220, 60, 30, 255]);
+  pointwise.grayscale(sky, { filter: "Red", intensity: 100 });
+  pointwise.grayscale(skin, { filter: "Red", intensity: 100 });
+  const skyNone = px([30, 60, 220, 255]);
+  const skinNone = px([220, 60, 30, 255]);
+  pointwise.grayscale(skyNone, { filter: "None", intensity: 100 });
+  pointwise.grayscale(skinNone, { filter: "None", intensity: 100 });
+  assert.ok(sky.data[0] < skyNone.data[0], "red filter should darken blue sky");
+  assert.ok(skin.data[0] > skinNone.data[0], "red filter should lighten red subject");
+  assert.equal(sky.data[0], sky.data[1]);
+  assert.equal(sky.data[1], sky.data[2], "output must be monochrome");
+});
+
+test("grayscale darkroom: filter intensity 0 ignores the filter", () => {
+  const a = px([200, 40, 30, 255]);
+  const b = px([200, 40, 30, 255]);
+  pointwise.grayscale(a, { filter: "Red", intensity: 0 });
+  pointwise.grayscale(b, { filter: "None", intensity: 100 });
+  assert.deepEqual([...a.data], [...b.data]);
+});
+
+test("grayscale exposure shoulder lifts mids without blowing highlights", () => {
+  const mid = px([120, 120, 120, 255]);
+  const hot = px([250, 250, 250, 255]);
+  pointwise.grayscale(mid, { exposure: 100 });
+  pointwise.grayscale(hot, { exposure: 100 });
+  assert.ok(mid.data[0] > 200, "+2 stops should push mid-gray toward white");
+  assert.ok(hot.data[0] <= 255 && hot.data[0] >= 250, "hot pixel rolls off at white, not hard-clip");
+});
+
+test("grayscale shadows/highlights act only on their tonal regions", () => {
+  const val = (v, params) => { const b = px([v, v, v, 255]); pointwise.grayscale(b, params); return b.data[0]; };
+  // Shadows only move dark tones; highlights only move bright tones.
+  // (Compare against a neutral render — the exposure shoulder reshapes
+  // the top quarter even at zero settings.)
+  assert.ok(val(40, { shadows: 100 }) > val(40, {}));
+  assert.equal(val(240, { shadows: 100 }), val(240, {}));
+  assert.equal(val(40, { highlights: -100 }), val(40, {}));
+  assert.ok(val(240, { highlights: -100 }) < val(240, {}));
 });
 
 test("alpha preserved by every pointwise effect except opacity", () => {

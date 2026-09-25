@@ -43,15 +43,49 @@ export function saturate(buffer, params) {
   return buffer;
 }
 
-export function grayscale(buffer, params) {
-  const target = 1 - pct(params);
+// B&W darkroom: colour-to-luminance with a coloured-contrast-filter model.
+// Each filter reweights the RGB contribution to luminance (its own colour
+// passes, the complement darkens); strong filters sum to < 1 because they
+// physically transmit less light — that's where the real darkening comes
+// from (a red 25A costs ~3 stops). `intensity` lerps standard luminance →
+// filter weights. Then on the scalar gray: EV gain with an exponential
+// shoulder (soft rolloff instead of hard clip), contrast around mid-gray,
+// and region-weighted shadow/highlight deltas. Always full monochrome —
+// params.v (the old Amount) is ignored; partial desat lives in `saturate`.
+const BW_FILTERS = {
+  none: [0.2126, 0.7152, 0.0722],
+  yellow: [0.34, 0.5, 0.08],
+  orange: [0.5, 0.35, 0.03],
+  red: [0.62, 0.12, 0.02],
+  green: [0.1, 0.8, 0.08],
+  blue: [0.06, 0.2, 0.6],
+};
+
+export function grayscale(buffer, params = {}) {
+  const w0 = BW_FILTERS.none;
+  const wf = BW_FILTERS[String(params.filter || "None").toLowerCase()] || w0;
+  const t = clamp(Number(params.intensity) || 0, 0, 100) / 100;
+  const wr = w0[0] + (wf[0] - w0[0]) * t;
+  const wg = w0[1] + (wf[1] - w0[1]) * t;
+  const wb = w0[2] + (wf[2] - w0[2]) * t;
+  const gain = Math.pow(2, clamp(Number(params.exposure) || 0, -100, 100) / 33.33);
+  const contrastK = Math.max(0.1, 1 + (clamp(Number(params.contrast) || 0, -100, 100) / 100) * 1.3);
+  const sAmt = (clamp(Number(params.shadows) || 0, -100, 100) / 100) * 180;
+  const hAmt = (clamp(Number(params.highlights) || 0, -100, 100) / 100) * 180;
+  const KNEE = 0.75, SOFT = 3;
+  const shoulderNorm = 1 - Math.exp(-SOFT * (1 - KNEE));
   const data = buffer.data;
   for (let i = 0; i < data.length; i += 4) {
-    const red = data[i], green = data[i + 1], blue = data[i + 2];
-    const luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
-    data[i] = clamp(luminance + (red - luminance) * target, 0, 255);
-    data[i + 1] = clamp(luminance + (green - luminance) * target, 0, 255);
-    data[i + 2] = clamp(luminance + (blue - luminance) * target, 0, 255);
+    let v = (wr * data[i] + wg * data[i + 1] + wb * data[i + 2]) * gain / 255;
+    if (v > KNEE) v = KNEE + (1 - KNEE) * (1 - Math.exp(-SOFT * (v - KNEE))) / shoulderNorm;
+    v = 128 + (v * 255 - 128) * contrastK;
+    const l = clamp(v, 0, 255) / 255;
+    const delta = sAmt * (l < 0.5 ? (1 - l / 0.5) * (1 - l / 0.5) : 0)
+      + hAmt * (l > 0.5 ? ((l - 0.5) / 0.5) * ((l - 0.5) / 0.5) : 0);
+    v = clamp(Math.round(v + delta), 0, 255);
+    data[i] = v;
+    data[i + 1] = v;
+    data[i + 2] = v;
   }
   return buffer;
 }

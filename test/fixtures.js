@@ -87,7 +87,7 @@ export const CASES = [
   ["saturate", "gradient", [{ type: "saturate", params: { v: 170 } }]],
   ["hue", "gradient", [{ type: "hue", params: { v: 45 } }]],
   ["sepia", "portrait", [{ type: "sepia", params: { v: 70 } }]],
-  ["grayscale", "gradient", [{ type: "grayscale", params: { v: 100 } }]],
+  ["grayscale", "gradient", [{ type: "grayscale", params: { filter: "Red", intensity: 70, exposure: 20, contrast: 15, shadows: 25, highlights: -15 } }]],
   ["invert", "gradient", [{ type: "invert", params: { v: 100 } }]],
   ["opacity", "portrait", [{ type: "opacity", params: { v: 60 } }]],
   ["blur", "checker", [{ type: "blur", params: { v: 3 } }]],
@@ -132,7 +132,7 @@ export const CASES = [
     { type: "chromatic", params: { offset: 2, strength: 60 } },
   ]],
   ["stack-print", "portrait", [
-    { type: "grayscale", params: { v: 100 } },
+    { type: "grayscale", params: { filter: "None", contrast: 20 } },
     { type: "contrast", params: { v: 150 } },
     { type: "posterize", params: { steps: 4 } },
     { type: "dropshadow", params: { x: 3, y: 4, blur: 2, color: "#000000" } },

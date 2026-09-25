@@ -14,7 +14,7 @@ const EXPECTED = {
   "saturate": "fb935706",
   "hue": "a79f0a5f",
   "sepia": "7a6332ba",
-  "grayscale": "95699312",
+  "grayscale": "18d92927",
   "invert": "c6b326ad",
   "opacity": "dc8e84dd",
   "blur": "1d5e2e8f",
@@ -43,7 +43,7 @@ const EXPECTED = {
   "stack-film": "0975c57d",
   "stack-neon": "3ffdf3fe",
   "stack-signal": "f5e5037a",
-  "stack-print": "75a83739",
+  "stack-print": "5f47365e",
   "stack-dream": "27342a91",
   "stack-drama": "7891f42a",
 };

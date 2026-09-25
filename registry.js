@@ -33,7 +33,18 @@ export const EFFECTS = {
   saturate: { category: "pointwise", apply: pointwise.saturate, params: { v: num(0, 300, 120, { unit: "%" }) } },
   hue: { category: "pointwise", apply: pointwise.hue, params: { v: num(0, 360, 0, { unit: "°" }) } },
   sepia: { category: "pointwise", apply: pointwise.sepia, params: { v: num(0, 100, 60, { unit: "%" }) } },
-  grayscale: { category: "pointwise", apply: pointwise.grayscale, params: { v: num(0, 100, 100, { unit: "%" }) } },
+  grayscale: {
+    category: "pointwise",
+    apply: pointwise.grayscale,
+    params: {
+      exposure: num(-100, 100, 0),
+      contrast: num(-100, 100, 0),
+      shadows: num(-100, 100, 0),
+      highlights: num(-100, 100, 0),
+      filter: sel(["None", "Yellow", "Orange", "Red", "Green", "Blue"], "None"),
+      intensity: num(0, 100, 50, { unit: "%" }),
+    },
+  },
   invert: { category: "pointwise", apply: pointwise.invert, params: { v: num(0, 100, 100, { unit: "%" }) } },
   opacity: { category: "pointwise", apply: pointwise.opacity, params: { v: num(0, 100, 80, { unit: "%" }) } },
 
