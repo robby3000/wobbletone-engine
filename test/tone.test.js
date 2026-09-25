@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { EFFECTS } from "../registry.js";
 import {
   duotone, tritone, posterize, posterizeByte, heatmap, drama, dramaSettings,
-  chromatic, mapPixelColor, solarize, hueband,
+  chromatic, mapPixelColor, solarize, hueband, shadowshighlights,
 } from "../effects/tone.js";
 
 // These cases are ported from wobbletonefx tests/pixel-effects.test.js —
@@ -93,6 +93,39 @@ test("chromatic offset 0 is identity and strength 0 is identity", () => {
   const s0 = pixels([[10, 1, 20, 255], [30, 2, 40, 255], [50, 3, 60, 255]], 3);
   chromatic(s0, { offset: 2, strength: 0 });
   assert.deepEqual([...s0.data], [10, 1, 20, 255, 30, 2, 40, 255, 50, 3, 60, 255]);
+});
+
+test("shadowshighlights lifts dark tones without touching highlights", () => {
+  const image = pixels([[20, 20, 20, 255], [235, 235, 235, 255]], 2);
+  shadowshighlights(image, { shadows: 100, highlights: 0 });
+  assert.ok(image.data[0] > 20, "shadow pixel should lift");
+  assert.deepEqual([...image.data.slice(4, 7)], [235, 235, 235], "highlight pixel untouched by shadows");
+});
+
+test("shadowshighlights dims bright tones without touching shadows", () => {
+  const image = pixels([[20, 20, 20, 255], [235, 235, 235, 255]], 2);
+  shadowshighlights(image, { shadows: 0, highlights: -100 });
+  assert.deepEqual([...image.data.slice(0, 3)], [20, 20, 20], "shadow pixel untouched by highlights");
+  assert.ok(image.data[4] < 235, "highlight pixel should dim");
+});
+
+test("shadowshighlights at zero is identity and preserves alpha", () => {
+  const image = pixels([[40, 90, 160, 200], [128, 128, 128, 90]], 2);
+  shadowshighlights(image, { shadows: 0, highlights: 0 });
+  assert.deepEqual([...image.data], [40, 90, 160, 200, 128, 128, 128, 90]);
+  const b = pixels([[30, 60, 90, 64]]);
+  shadowshighlights(b, { shadows: 80, highlights: -50 });
+  assert.equal(b.data[3], 64);
+});
+
+test("shadowshighlights masks peak at the tonal extremes", () => {
+  const dark = pixels([[30, 30, 30, 255]]);
+  const mid = pixels([[128, 128, 128, 255]]);
+  shadowshighlights(dark, { shadows: 100, highlights: 0 });
+  shadowshighlights(mid, { shadows: 100, highlights: 0 });
+  // Mid-gray sits at the shadow mask's zero point; near-black lifts hard.
+  assert.ok(dark.data[0] - 30 > 60);
+  assert.ok(Math.abs(mid.data[0] - 128) <= 1);
 });
 
 test("drama at zero strength is neutral and preserves alpha", () => {

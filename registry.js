@@ -63,6 +63,11 @@ export const EFFECTS = {
     params: { bands: num(2, 16, 6), spread: num(0, 100, 0, { unit: "%" }) },
   },
   heatmap: { category: "tone", apply: tone.heatmap, params: { intensity: num(0, 100, 100, { unit: "%" }) } },
+  shadowshighlights: {
+    category: "tone",
+    apply: tone.shadowshighlights,
+    params: { shadows: num(-100, 100, 40, { unit: "%" }), highlights: num(-100, 100, -20, { unit: "%" }) },
+  },
   drama: {
     category: "tone",
     apply: tone.drama,

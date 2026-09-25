@@ -95,6 +95,7 @@ export const CASES = [
   ["tritone", "portrait", [{ type: "tritone", params: { shadow: "#0b1d3a", mid: "#c44d4d", highlight: "#ffe8a3" } }]],
   ["posterize", "gradient", [{ type: "posterize", params: { steps: 6 } }]],
   ["heatmap", "noise", [{ type: "heatmap", params: { intensity: 100 } }]],
+  ["shadowshighlights", "gradient", [{ type: "shadowshighlights", params: { shadows: 60, highlights: -40 } }]],
   ["drama", "portrait", [{ type: "drama", params: { style: "Noir", strength: 80, shadows: 10, highlights: -10, saturation: 110 } }]],
   ["chromatic", "checker", [{ type: "chromatic", params: { offset: 3, strength: 80 } }]],
   ["bloom", "portrait", [{ type: "bloom", params: { blur: 5, threshold: 160, contrast: 150, saturate: 120, opacity: 60, color: "#ffcc88", tint: 30, blend: "screen" } }]],

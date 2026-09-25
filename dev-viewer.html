@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>wobbletone-engine — dev viewer</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; font: 13px/1.5 ui-monospace, Menlo, monospace; background: #0e0e14; color: #d8d8e4; }
+  header { padding: 10px 16px; border-bottom: 1px solid #26263a; display: flex; gap: 12px; align-items: baseline; }
+  header h1 { font-size: 14px; margin: 0; font-weight: 600; }
+  header span { color: #7a7a96; font-size: 12px; }
+  main { display: grid; grid-template-columns: 340px 1fr; min-height: calc(100vh - 42px); }
+  aside { border-right: 1px solid #26263a; padding: 12px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+  section h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #7a7a96; margin: 0 0 6px; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; }
+  button, label.btn { background: #1c1c2c; color: #d8d8e4; border: 1px solid #363650; border-radius: 6px; padding: 5px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+  button:hover, label.btn:hover { border-color: #7c5cff; }
+  button.primary { background: #7c5cff; border-color: #7c5cff; color: #fff; }
+  select { background: #1c1c2c; color: #d8d8e4; border: 1px solid #363650; border-radius: 6px; padding: 5px; font: inherit; font-size: 12px; width: 100%; }
+  textarea { width: 100%; box-sizing: border-box; min-height: 180px; background: #14141f; color: #d8d8e4; border: 1px solid #363650; border-radius: 6px; padding: 8px; font: inherit; font-size: 11px; resize: vertical; }
+  #stage { padding: 16px; display: flex; flex-direction: column; gap: 16px; align-items: flex-start; overflow: auto; }
+  .panel { display: flex; gap: 16px; flex-wrap: wrap; }
+  figure { margin: 0; }
+  figcaption { color: #7a7a96; font-size: 11px; margin-bottom: 4px; }
+  canvas { background: repeating-conic-gradient(#1a1a26 0 25%, #14141f 0 50%) 0 0/16px 16px; border: 1px solid #26263a; border-radius: 4px; max-width: 100%; }
+  #stats { color: #9a9ab8; font-size: 11px; white-space: pre-wrap; }
+  #err { color: #ff7a90; font-size: 12px; white-space: pre-wrap; }
+  input[type=file] { display: none; }
+  #cases { max-height: 220px; overflow-y: auto; border: 1px solid #26263a; border-radius: 6px; }
+  #cases button { display: block; width: 100%; text-align: left; border: 0; border-bottom: 1px solid #1c1c2c; border-radius: 0; }
+  #cases button:last-child { border-bottom: 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>wobbletone-engine</h1>
+  <span id="ver"></span>
+  <span>dev viewer — pure JS render, no ctx.filter</span>
+</header>
+<main>
+  <aside>
+    <section>
+      <h2>Source</h2>
+      <div class="row" id="fixtures"></div>
+      <div class="row"><label class="btn">Load image…<input id="file" type="file" accept="image/*"></label></div>
+      <div class="row">max dim <select id="maxdim" style="width:auto">
+        <option value="96">96</option><option value="256" selected>256</option>
+        <option value="512">512</option><option value="1024">1024</option><option value="0">native</option>
+      </select></div>
+    </section>
+    <section>
+      <h2>Golden cases</h2>
+      <div id="cases"></div>
+    </section>
+    <section>
+      <h2>Spec JSON</h2>
+      <textarea id="spec" spellcheck="false"></textarea>
+      <div class="row">
+        <button class="primary" id="render">Render</button>
+        <button id="pretty">Format</button>
+      </div>
+      <div id="err"></div>
+    </section>
+  </aside>
+  <div id="stage">
+    <div class="panel">
+      <figure><figcaption>source</figcaption><canvas id="src"></canvas></figure>
+      <figure><figcaption>rendered</figcaption><canvas id="dst"></canvas></figure>
+    </div>
+    <div id="stats"></div>
+  </div>
+</main>
+<script type="module">
+import { ENGINE_VERSION } from "./version.js";
+import { renderBuffer } from "./render.js";
+import { drawToBuffer, bufferToCanvas, canvasToBuffer } from "./canvas.js";
+import { FIXTURES, CASES } from "./test/fixtures.js";
+
+document.getElementById("ver").textContent = `engine v${ENGINE_VERSION}`;
+
+const srcCanvas = document.getElementById("src");
+const dstCanvas = document.getElementById("dst");
+const specBox = document.getElementById("spec");
+const errBox = document.getElementById("err");
+const statsBox = document.getElementById("stats");
+
+let source = { kind: "fixture", name: "portrait" };   // or { kind:"image", img, w, h }
+let currentFixture = "portrait";
+let sourceBitmap = null; // Image element when kind === "image"
+
+function showSource() {
+  let buf;
+  if (source.kind === "fixture") {
+    buf = FIXTURES[source.name]();
+    srcCanvas.width = buf.width; srcCanvas.height = buf.height;
+    srcCanvas.getContext("2d").putImageData(new ImageData(buf.data, buf.width, buf.height), 0, 0);
+  } else {
+    const maxDim = Number(document.getElementById("maxdim").value) || 0;
+    const scale = maxDim ? Math.min(1, maxDim / Math.max(source.w, source.h)) : 1;
+    srcCanvas.width = Math.max(1, Math.round(source.w * scale));
+    srcCanvas.height = Math.max(1, Math.round(source.h * scale));
+    srcCanvas.getContext("2d").drawImage(source.img, 0, 0, srcCanvas.width, srcCanvas.height);
+  }
+}
+
+function sourceBuffer() {
+  if (source.kind === "fixture") return { buffer: FIXTURES[source.name](), sourceWidth: null };
+  return { buffer: canvasToBuffer(srcCanvas), sourceWidth: source.w };
+}
+
+function render() {
+  errBox.textContent = "";
+  try {
+    const spec = JSON.parse(specBox.value);
+    const { buffer, sourceWidth } = sourceBuffer();
+    const opts = { collectStats: true };
+    if (sourceWidth) opts.sourceWidth = sourceWidth;
+    const out = renderBuffer(buffer, spec, opts);
+    const c = bufferToCanvas(out);
+    dstCanvas.width = c.width; dstCanvas.height = c.height;
+    dstCanvas.getContext("2d").drawImage(c, 0, 0);
+    const s = opts.stats;
+    statsBox.textContent = `${s.passes} effect(s), ${s.ms.toFixed(1)} ms total\n` +
+      s.perEffect.map((e) => `  ${e.type.padEnd(14)} ${e.ms.toFixed(1)} ms`).join("\n");
+  } catch (e) {
+    errBox.textContent = e.message;
+  }
+}
+
+for (const name of Object.keys(FIXTURES)) {
+  const b = document.createElement("button");
+  b.textContent = name;
+  b.onclick = () => { source = { kind: "fixture", name }; showSource(); render(); };
+  document.getElementById("fixtures").append(b);
+}
+
+for (const [name, fixture, effects] of CASES) {
+  const b = document.createElement("button");
+  b.textContent = `${name} (${fixture})`;
+  b.onclick = () => {
+    source = { kind: "fixture", name: fixture };
+    specBox.value = JSON.stringify({ format: "wobbletone-filter", version: 1, name, effects }, null, 2);
+    showSource(); render();
+  };
+  document.getElementById("cases").append(b);
+}
+
+document.getElementById("file").onchange = (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const img = new Image();
+  img.onload = () => {
+    sourceBitmap = img;
+    source = { kind: "image", img, w: img.naturalWidth, h: img.naturalHeight };
+    showSource(); render();
+  };
+  img.src = URL.createObjectURL(f);
+};
+
+document.getElementById("maxdim").onchange = () => { showSource(); render(); };
+document.getElementById("render").onclick = render;
+document.getElementById("pretty").onclick = () => {
+  try { specBox.value = JSON.stringify(JSON.parse(specBox.value), null, 2); errBox.textContent = ""; }
+  catch (e) { errBox.textContent = e.message; }
+};
+
+specBox.value = JSON.stringify({
+  format: "wobbletone-filter", version: 1, name: "demo",
+  effects: [
+    { type: "vintage", params: { sepia: 45, contrast: 95, saturate: 80, brightness: 105 } },
+    { type: "vignette", params: { color: "#1a0d00", size: 60, opacity: 55 } },
+    { type: "grain", params: { size: 1.0, opacity: 30, blend: "overlay", seed: 3 } },
+  ],
+}, null, 2);
+showSource();
+render();
+</script>
+</body>
+</html>

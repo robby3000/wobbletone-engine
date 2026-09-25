@@ -22,6 +22,7 @@ const EXPECTED = {
   "tritone": "7ee8c19e",
   "posterize": "bb26b925",
   "heatmap": "64249c1f",
+  "shadowshighlights": "d8f893aa",
   "drama": "ab4b7291",
   "chromatic": "38ec18c5",
   "bloom": "b3fb5d15",

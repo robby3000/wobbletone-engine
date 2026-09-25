@@ -114,6 +114,28 @@ export function hueband(buffer, params) {
   return buffer;
 }
 
+/* ---------- shadows / highlights ---------- */
+
+// Region-weighted tonal adjustment. The shadow mask (1 − l/0.5)² peaks at
+// black and fades out at mid-gray; the highlight mask mirrors it. Deltas are
+// additive per channel, scaled by the masks — smooth, monotonic, cheap.
+export function shadowshighlights(buffer, params) {
+  const sAmt = (params.shadows / 100) * 140;
+  const hAmt = (params.highlights / 100) * 140;
+  const data = buffer.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const l = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) / 255;
+    const ws = l < 0.5 ? (1 - l / 0.5) * (1 - l / 0.5) : 0;
+    const wh = l > 0.5 ? ((l - 0.5) / 0.5) * ((l - 0.5) / 0.5) : 0;
+    const delta = sAmt * ws + hAmt * wh;
+    if (delta === 0) continue;
+    data[i] = clamp(Math.round(data[i] + delta), 0, 255);
+    data[i + 1] = clamp(Math.round(data[i + 1] + delta), 0, 255);
+    data[i + 2] = clamp(Math.round(data[i + 2] + delta), 0, 255);
+  }
+  return buffer;
+}
+
 /* ---------- drama ---------- */
 
 // Per-look recipe, all interpolated by `strength`:
