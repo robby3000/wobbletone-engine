@@ -6,15 +6,15 @@
 // translation commutes with convolution.
 // params.x/y/blur are px-flagged → arrive already scaled to render px.
 
-import { makeBuffer } from "../buffer.js";
 import { parseCssColor, compositeOver } from "../color.js";
+import { acquireBuffer, releaseBuffer } from "../pool.js";
 import { gaussianBlur } from "./blur.js";
 
 export function dropshadow(buffer, params) {
   const { width, height } = buffer;
   const [r, g, b, ca] = parseCssColor(params.color);
 
-  const silhouette = makeBuffer(width, height);
+  const silhouette = acquireBuffer(width, height); // zeroed — only alpha is written below
   for (let i = 0; i < silhouette.data.length; i += 4) {
     silhouette.data[i + 3] = buffer.data[i + 3];
   }
@@ -22,7 +22,7 @@ export function dropshadow(buffer, params) {
 
   const dx = Math.round(params.x);
   const dy = Math.round(params.y);
-  const under = makeBuffer(width, height);
+  const under = acquireBuffer(width, height); // zeroed — sparse writes below
   const ud = under.data;
   const ad = silhouette.data;
   const alphaScale = ca / 255;
@@ -44,5 +44,7 @@ export function dropshadow(buffer, params) {
 
   compositeOver(under, buffer, "normal", 100);
   buffer.data.set(under.data);
+  releaseBuffer(silhouette);
+  releaseBuffer(under);
   return buffer;
 }

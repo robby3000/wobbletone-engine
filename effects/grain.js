@@ -13,7 +13,7 @@
 
 import { seededRandom } from "../rng.js";
 import { compositeOver } from "../color.js";
-import { makeBuffer } from "../buffer.js";
+import { acquireBuffer, releaseBuffer } from "../pool.js";
 
 export const GRAIN_CELL_SCALE = 200 / 180;
 
@@ -43,7 +43,7 @@ export function grainValue(seed, x, y, cellPx) {
 export function grain(buffer, params) {
   const cellPx = Math.max(params.size * GRAIN_CELL_SCALE, 1e-6);
   const { width, height } = buffer;
-  const layer = makeBuffer(width, height);
+  const layer = acquireBuffer(width, height, { zero: false }); // every pixel written below
   const d = layer.data;
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
@@ -55,5 +55,7 @@ export function grain(buffer, params) {
       d[i + 3] = 255;
     }
   }
-  return compositeOver(buffer, layer, params.blend, params.opacity);
+  compositeOver(buffer, layer, params.blend, params.opacity);
+  releaseBuffer(layer);
+  return buffer;
 }

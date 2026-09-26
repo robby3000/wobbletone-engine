@@ -9,21 +9,25 @@
 //       opacity%.
 // params.blur is px-flagged → arrives already scaled to render px.
 
-import { cloneBuffer } from "../buffer.js";
+import { acquireBuffer, releaseBuffer } from "../pool.js";
 import { compositeOver } from "../color.js";
 import { brightness, contrast, saturate } from "./pointwise.js";
 import { gaussianBlur } from "./blur.js";
 import { solidFillLayer } from "./overlay.js";
 
 export function bloom(buffer, params) {
-  const copy = cloneBuffer(buffer);
+  const copy = acquireBuffer(buffer.width, buffer.height, { zero: false });
+  copy.data.set(buffer.data);
   brightness(copy, { v: params.threshold });
   contrast(copy, { v: params.contrast });
   gaussianBlur(copy, params.blur);
   saturate(copy, { v: params.saturate });
   if (params.tint > 0) {
-    compositeOver(copy, solidFillLayer(copy.width, copy.height, params.color), "color", params.tint);
+    const tint = solidFillLayer(copy.width, copy.height, params.color);
+    compositeOver(copy, tint, "color", params.tint);
+    releaseBuffer(tint);
   }
   compositeOver(buffer, copy, params.blend, params.opacity);
+  releaseBuffer(copy);
   return buffer;
 }

@@ -39,12 +39,23 @@ export function bufferToCanvas(buffer) {
   return canvas;
 }
 
+// Module-level scratch canvas for drawToBuffer — resized (which clears it)
+// only when dimensions change. bufferToCanvas's output is NOT pooled: the
+// returned element is retained by callers (preview canvas, preset thumbs).
+let _scratch = null;
+function scratchCanvas(w, h) {
+  if (!_scratch) _scratch = document.createElement("canvas");
+  if (_scratch.width !== w || _scratch.height !== h) {
+    _scratch.width = w;
+    _scratch.height = h;
+  }
+  return _scratch;
+}
+
 // Draw an image source to a scratch canvas at (w × h) and read the pixels.
 export function drawToBuffer(source, width, height) {
   requireDOM();
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
+  const canvas = scratchCanvas(width, height);
   const ctx = canvas.getContext("2d");
   ctx.drawImage(source, 0, 0, width, height);
   return canvasToBuffer(canvas);

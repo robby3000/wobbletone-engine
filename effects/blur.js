@@ -5,6 +5,7 @@
 // bytes happens once, at the final write-back.
 
 import { clamp } from "../color.js";
+import { acquireFloats, releaseFloats } from "../pool.js";
 
 export function gaussianKernel(sigma) {
   const radius = Math.max(1, Math.ceil(sigma * 3));
@@ -23,7 +24,7 @@ export function gaussianBlur(buffer, sigma) {
   if (!(sigma > 0)) return buffer;
   const { weights, radius } = gaussianKernel(sigma);
   const { data, width: W, height: H } = buffer;
-  const scratch = new Float64Array(data.length);
+  const scratch = acquireFloats(data.length); // fully written by pass 1 — no zero needed
 
   for (let y = 0; y < H; y++) {
     const row = y * W;
@@ -64,6 +65,7 @@ export function gaussianBlur(buffer, sigma) {
       data[o + 3] = a;
     }
   }
+  releaseFloats(scratch);
   return buffer;
 }
 

@@ -6,7 +6,7 @@
 // semantics: transparent→color fades alpha while holding hue.
 
 import { clamp, parseCssColor, compositeOver } from "../color.js";
-import { makeBuffer } from "../buffer.js";
+import { acquireBuffer, releaseBuffer } from "../pool.js";
 
 /* ---------- stop sampling (premultiplied, CSS semantics) ---------- */
 
@@ -34,8 +34,10 @@ export function sampleStops(stops, t) {
 
 /* ---------- layer generators ---------- */
 
+// Layer generators draw from the buffer pool (every pixel is written, so
+// dirty reuse is safe) — CALLERS must releaseBuffer(layer) after compositing.
 export function solidFillLayer(width, height, color) {
-  const layer = makeBuffer(width, height);
+  const layer = acquireBuffer(width, height, { zero: false });
   const [r, g, b, a] = parseCssColor(color);
   const d = layer.data;
   for (let i = 0; i < d.length; i += 4) {
@@ -52,7 +54,7 @@ export function linearGradientLayer(width, height, angle, stops) {
   const dx = Math.sin(radians);
   const dy = -Math.cos(radians);
   const length = Math.abs(width * dx) + Math.abs(height * dy);
-  const layer = makeBuffer(width, height);
+  const layer = acquireBuffer(width, height, { zero: false });
   const d = layer.data;
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
@@ -69,7 +71,7 @@ export function linearGradientLayer(width, height, angle, stops) {
 // distance 1 at edge midpoints, √2 at corners (clamps to the last stop).
 // Ported from the vignette branch of drawEffectBackground.
 export function radialGradientLayer(width, height, stops) {
-  const layer = makeBuffer(width, height);
+  const layer = acquireBuffer(width, height, { zero: false });
   const d = layer.data;
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
@@ -87,7 +89,7 @@ export function radialGradientLayer(width, height, stops) {
 // 1px lines of `color` every `size` px (y += size, fillRect(0,y,W,1) ported
 // as per-row coverage so fractional sizes behave like canvas AA).
 export function scanlinesLayer(width, height, size, color) {
-  const layer = makeBuffer(width, height);
+  const layer = acquireBuffer(width, height, { zero: false });
   const [r, g, b, a] = parseCssColor(color);
   const d = layer.data;
   const s = Math.max(size, 1e-6);
@@ -105,30 +107,38 @@ export function scanlinesLayer(width, height, size, color) {
 
 /* ---------- effects ---------- */
 
+// Each effect: build a pooled layer, compositeOver, release. Layers never
+// escape the call — pool-only scratch, per the P4 ownership rule.
+const compositeLayer = (buffer, layer, blend, opacity) => {
+  compositeOver(buffer, layer, blend, opacity);
+  releaseBuffer(layer);
+  return buffer;
+};
+
 export function colorwash(buffer, params) {
-  return compositeOver(buffer, solidFillLayer(buffer.width, buffer.height, params.color), params.blend, params.opacity);
+  return compositeLayer(buffer, solidFillLayer(buffer.width, buffer.height, params.color), params.blend, params.opacity);
 }
 
 export function gradient(buffer, params) {
   const layer = linearGradientLayer(buffer.width, buffer.height, params.angle, [[0, params.c1], [1, params.c2]]);
-  return compositeOver(buffer, layer, params.blend, params.opacity);
+  return compositeLayer(buffer, layer, params.blend, params.opacity);
 }
 
 export function overlay(buffer, params) {
   const layer = params.kind === "radial"
     ? radialGradientLayer(buffer.width, buffer.height, params.stops)
     : linearGradientLayer(buffer.width, buffer.height, params.angle, params.stops);
-  return compositeOver(buffer, layer, params.blend, params.opacity);
+  return compositeLayer(buffer, layer, params.blend, params.opacity);
 }
 
 export function vignette(buffer, params) {
   const stops = [[(100 - params.size) / 100, "transparent"], [1, params.color]];
-  return compositeOver(buffer, radialGradientLayer(buffer.width, buffer.height, stops), "multiply", params.opacity);
+  return compositeLayer(buffer, radialGradientLayer(buffer.width, buffer.height, stops), "multiply", params.opacity);
 }
 
 export function scanlines(buffer, params) {
   const layer = scanlinesLayer(buffer.width, buffer.height, params.size, params.color);
-  return compositeOver(buffer, layer, params.blend, params.opacity);
+  return compositeLayer(buffer, layer, params.blend, params.opacity);
 }
 
 export function prism(buffer, params) {
@@ -140,5 +150,5 @@ export function prism(buffer, params) {
     [0.5 + w / 600, params.c2],
     [0.5 + w / 200, "transparent"],
   ];
-  return compositeOver(buffer, linearGradientLayer(buffer.width, buffer.height, params.angle, stops), "screen", params.opacity);
+  return compositeLayer(buffer, linearGradientLayer(buffer.width, buffer.height, params.angle, stops), "screen", params.opacity);
 }

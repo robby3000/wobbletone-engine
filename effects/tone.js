@@ -7,7 +7,8 @@
 
 import { clamp, q8, lerpByte, hexToRgb, rgbToHsl, hslToRgb } from "../color.js";
 import { gaussianBlur } from "./blur.js";
-import { cloneBuffer, mapPixels } from "../buffer.js";
+import { mapPixels } from "../buffer.js";
+import { acquireBuffer, releaseBuffer } from "../pool.js";
 
 const runStep = (buffer, step) => mapPixels(buffer, [step]);
 
@@ -225,7 +226,9 @@ export function drama(buffer, params) {
   const data = buffer.data;
   let soft = null;
   if (Math.abs(clarity) > 0.001 || glow > 0.001) {
-    soft = gaussianBlur(cloneBuffer(buffer), Math.min(buffer.width, buffer.height) / 320);
+    soft = acquireBuffer(buffer.width, buffer.height, { zero: false });
+    soft.data.set(buffer.data);
+    gaussianBlur(soft, Math.min(buffer.width, buffer.height) / 320);
   }
   for (let i = 0; i < data.length; i += 4) {
     let r = data[i], g = data[i + 1], b = data[i + 2];
@@ -257,6 +260,7 @@ export function drama(buffer, params) {
     data[i + 1] = sampleDramaTable(green, tables[1]);
     data[i + 2] = sampleDramaTable(blue, tables[2]);
   }
+  if (soft) releaseBuffer(soft);
   return buffer;
 }
 
@@ -264,7 +268,9 @@ export function drama(buffer, params) {
 
 export function chromatic(buffer, params) {
   const data = buffer.data;
-  const original = new Uint8ClampedArray(data);
+  const copy = acquireBuffer(buffer.width, buffer.height, { zero: false });
+  const original = copy.data;
+  original.set(data);
   const offset = Math.round(params.offset);
   const strength = params.strength / 100;
   const W = buffer.width, H = buffer.height;
@@ -278,5 +284,6 @@ export function chromatic(buffer, params) {
       data[i + 2] = lerpByte(original[i + 2], original[bi + 2], strength);
     }
   }
+  releaseBuffer(copy);
   return buffer;
 }

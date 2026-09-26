@@ -17,6 +17,7 @@
 import { seededRandom } from "../rng.js";
 import { clamp, rgbToHsl, hslToRgb } from "../color.js";
 import { posterizeByte } from "./tone.js";
+import { acquireBuffer, releaseBuffer } from "../pool.js";
 
 // corruptMix = pick weights for [hueShift, desat, killChannel, posterize].
 export const GLITCH_PROFILES = {
@@ -109,7 +110,9 @@ function applyCorrupt(band, rgb) {
 export function glitch(buffer, params, ctx = {}) {
   const renderScale = ctx.renderScale || 1;
   const { width, height, data } = buffer;
-  const source = new Uint8ClampedArray(data);
+  const copy = acquireBuffer(width, height, { zero: false });
+  const source = copy.data;
+  source.set(data);
   const { bands, split, rowSeed } = buildGlitchBands(params, width, height, renderScale);
   const rgb = [0, 0, 0];
   for (const band of bands) {
@@ -140,5 +143,6 @@ export function glitch(buffer, params, ctx = {}) {
       }
     }
   }
+  releaseBuffer(copy);
   return buffer;
 }
