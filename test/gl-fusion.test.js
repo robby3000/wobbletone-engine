@@ -24,11 +24,30 @@ test("non-pixel-local effects are not GPU steps", () => {
   }
 });
 
+test("blur runs are GPU-renderable (G4); mixed stacks qualify", () => {
+  assert.equal(canRenderGPU(spec([{ type: "blur", params: { v: 8 } }])), true);
+  assert.equal(canRenderGPU(spec([
+    { type: "brightness", params: { v: 110 } },
+    { type: "blur", params: { v: 8 } },
+    { type: "invert", params: { v: 20 } },
+  ])), true);
+  // drama's internal blur is not a "blur" run — stays CPU
+  assert.equal(canRenderGPU(spec([{ type: "drama", params: {} }])), false);
+});
+
+test("blurFits gates kernel size against the uniform budget", async () => {
+  const { blurFits } = await import("../gl/effects/blur.js");
+  assert.equal(blurFits(1, 64), true);     // 7 taps -> 2 vec4s
+  assert.equal(blurFits(20, 64), true);    // 121 taps -> 31 vec4s
+  assert.equal(blurFits(20, 16), false);   // too weak a uniform budget
+  assert.equal(blurFits(50, 256), false);  // 301 taps > 256-slot array
+});
+
 test("canRenderGPU gates on the whole expanded spec", () => {
   assert.equal(canRenderGPU(spec([{ type: "invert", params: { v: 100 } }])), true);
   assert.equal(canRenderGPU(spec([
     { type: "invert", params: { v: 100 } },
-    { type: "blur", params: { v: 4 } },          // spatial -> whole render stays CPU
+    { type: "drama", params: {} },               // no GPU path -> whole render stays CPU
   ])), false);
   assert.equal(canRenderGPU(spec([{ type: "bogus", params: {} }])), false);
   assert.equal(canRenderGPU({ nope: true }), false);
