@@ -7,6 +7,7 @@ export function setUniform(gl, prog, { name, type, value }) {
   switch (type) {
     case "float": gl.uniform1f(loc, value); break;
     case "int": gl.uniform1i(loc, value); break;
+    case "uint": gl.uniform1ui(loc, value); break;
     case "vec2": gl.uniform2f(loc, value[0], value[1]); break;
     case "vec3": gl.uniform3f(loc, value[0], value[1], value[2]); break;
     case "vec4": gl.uniform4f(loc, value[0], value[1], value[2], value[3]); break;

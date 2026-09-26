@@ -105,10 +105,10 @@ export function renderBufferGPU(buffer, spec, options = {}) {
         physicalPasses++;
       } else if (run[0].type === "glitch") {
         const params = scaleParams(EFFECTS.glitch, run[0].params, renderScale);
-        const dst = applyGlitchGPU(inf, cur, params, renderScale);
-        if (!dst) return fail(options, inf.session.lost ? "context-lost" : "bands-over-limit");
-        held.push(dst);
-        cur = dst;
+        const res = applyGlitchGPU(inf, cur, params, renderScale);
+        if (!res.dst) return fail(options, res.reason || "gl-error");
+        held.push(res.dst);
+        cur = res.dst;
         physicalPasses++;
       } else if (run[0].type === "bloom" || run[0].type === "chromatic") {
         const params = scaleParams(EFFECTS[run[0].type], run[0].params, renderScale);
@@ -147,6 +147,8 @@ export function renderBufferGPU(buffer, spec, options = {}) {
         fallbackReason: null,
         logical: validated.effects.length,
         passes: physicalPasses,
+        fusedRuns: runs.filter((r) => r.every((e) => canRunGPU(e.type))).length,
+        textureBytes: held.reduce((s, hnd) => s + hnd.w * hnd.h * 4, 0),
         perEffect,
       };
     }

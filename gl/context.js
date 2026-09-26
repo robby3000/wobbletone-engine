@@ -72,25 +72,28 @@ function probe() {
 let session = null;
 
 export function acquireGLContext() {
-  if (session && !session.gl.isContextLost()) return session;
+  if (session && !session.lost && !session.gl.isContextLost()) return session;
   if (typeof document === "undefined") return null;
   const canvas = document.createElement("canvas");
   const gl = canvas.getContext("webgl2", {
     alpha: true, antialias: false, depth: false, stencil: false,
     preserveDrawingBuffer: false,
   });
-  if (!gl) return null;
-  session = { gl, canvas, lost: false, generation: 0, onRestore: null };
+  if (!gl) { session = null; return null; }
+  const s = { gl, canvas, lost: false, generation: 0, onRestore: null };
+  session = s;
+  // Listeners mutate THIS session object, not the module binding — a
+  // replaced session's late events must not corrupt the live one.
   canvas.addEventListener("webglcontextlost", (e) => {
     e.preventDefault();
-    session.lost = true;
+    s.lost = true;
   });
   canvas.addEventListener("webglcontextrestored", () => {
-    session.lost = false;
-    session.generation++;        // programs/pools check this and rebuild
-    session.onRestore?.(session);
+    s.lost = false;
+    s.generation++;              // programs/pools check this and rebuild
+    s.onRestore?.(s);
   });
-  return session;
+  return s;
 }
 
 export function releaseGLContext() {

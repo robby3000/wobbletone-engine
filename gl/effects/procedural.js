@@ -40,7 +40,6 @@ float mulberry32(uint v) {
 export const GRAIN_SHADER = /* glsl */ `#version 300 es
 precision highp float;
 precision highp int;
-precision highp uint;
 uniform sampler2D uSrc;
 uniform vec2 uDims;
 uniform uint uSeed;
@@ -83,7 +82,7 @@ export function applyGrainGPU(inf, srcH, params) {
   const dst = inf.pool.acquire(srcH.w, srcH.h);
   gl.useProgram(prog);
   setUniform(gl, prog, { name: "uDims", type: "vec2", value: [srcH.w, srcH.h] });
-  setUniform(gl, prog, { name: "uSeed", type: "int", value: params.seed >>> 0 });
+  setUniform(gl, prog, { name: "uSeed", type: "uint", value: params.seed >>> 0 });
   setUniform(gl, prog, { name: "uCellPx", type: "float", value: cellPx });
   setUniform(gl, prog, { name: "uMode", type: "int", value: BLEND_INDEX[params.blend] ?? 0 });
   setUniform(gl, prog, { name: "uOpacity", type: "float", value: params.opacity / 100 });
@@ -108,7 +107,6 @@ export function applyGrainGPU(inf, srcH, params) {
 export const GLITCH_SHADER = /* glsl */ `#version 300 es
 precision highp float;
 precision highp int;
-precision highp uint;
 uniform sampler2D uSrc;
 uniform vec2 uDims;
 uniform int uNBands;
@@ -197,7 +195,7 @@ export function glitchBandUniforms(built) {
   return [
     { name: "uBands", type: "vec4[]", value: flat },
     { name: "uNBands", type: "int", value: built.bands.length },
-    { name: "uRowSeed", type: "int", value: built.rowSeed >>> 0 },
+    { name: "uRowSeed", type: "uint", value: built.rowSeed >>> 0 },
   ];
 }
 
@@ -205,10 +203,10 @@ export function applyGlitchGPU(inf, srcH, params, renderScale) {
   const gl = inf.session.gl;
   const built = buildGlitchBands(params, srcH.w, srcH.h, renderScale); // CPU — sequential RNG
   const uniforms = glitchBandUniforms(built);
-  if (!uniforms) return null; // too many bands -> CPU
-  if (!glitchUniformLimit(built.bands.length, detectCapabilities().maxFragmentUniforms)) return null;
+  if (!uniforms) return { reason: "bands-over-limit" };
+  if (!glitchUniformLimit(built.bands.length, detectCapabilities().maxFragmentUniforms)) return { reason: "bands-over-limit" };
   const prog = inf.programs.get(GLITCH_SHADER, "glitch");
-  if (!prog) return null;
+  if (!prog) return { reason: "shader-compile" };
   const dst = inf.pool.acquire(srcH.w, srcH.h);
   gl.useProgram(prog);
   setUniform(gl, prog, { name: "uDims", type: "vec2", value: [srcH.w, srcH.h] });
@@ -221,8 +219,8 @@ export function applyGlitchGPU(inf, srcH, params, renderScale) {
   gl.bindVertexArray(inf.programs.quad().vao);
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   gl.bindVertexArray(null);
-  if (gl.isContextLost()) { inf.pool.release(dst); return null; }
-  return dst;
+  if (gl.isContextLost()) { inf.pool.release(dst); return { reason: "context-lost" }; }
+  return { dst };
 }
 
 // Uniform budget gate: 3 vec4 per band + ~10 fixed vectors.

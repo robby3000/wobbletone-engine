@@ -75,6 +75,16 @@ export function loadImage(src) {
 // Render a spec against an image source → canvas at min(native, maxDim-capped)
 // resolution. options.sourceWidth/sourceHeight override the source's own
 // dimensions when the caller knows them better (e.g. EXIF-rotated inputs).
+// Renderer session state — the degradation ladder's lower rungs.
+// gpuDemoted trips after 3 consecutive renders where a shadowed CPU
+// pass was faster (weak-but-capable GPUs get demoted for the session).
+const gpuSession = { demoted: false, slowerStreak: 0, rendersSinceProbe: 0 };
+export function _gpuSessionForTest() { return gpuSession; }
+export function demoteGPUForSession() { gpuSession.demoted = true; }
+
+// Every Nth GPU render also runs the CPU path to compare wall times.
+const SHADOW_INTERVAL = 8;
+
 export function renderToCanvas(imageOrBitmap, spec, options = {}) {
   requireDOM();
   const srcW = options.sourceWidth ?? imageOrBitmap.naturalWidth ?? imageOrBitmap.width;
@@ -84,9 +94,12 @@ export function renderToCanvas(imageOrBitmap, spec, options = {}) {
   const h = Math.max(1, Math.round(srcH * scale));
   // Renderer selection is per render — texture-size is checked against
   // these actual dims. GPU takes it only when the whole expanded spec is
-  // pixel-local (v1 rule); any failure falls back to the CPU render of
-  // the same spec, never a partial pipeline.
-  const pick = pickRenderer({ renderer: options.renderer, width: w, height: h });
+  // GPU-covered; any failure falls back to the CPU render of the same
+  // spec, never a partial pipeline. A session-demoted GPU is skipped
+  // entirely (gpu-slower-than-cpu).
+  const pick = gpuSession.demoted
+    ? { renderer: "cpu", reason: "gpu-slower-than-cpu" }
+    : pickRenderer({ renderer: options.renderer, width: w, height: h });
   const src = drawToBuffer(imageOrBitmap, w, h);
   const renderOpts = { sourceWidth: srcW, collectStats: options.collectStats };
   let rendered = null;
@@ -98,6 +111,7 @@ export function renderToCanvas(imageOrBitmap, spec, options = {}) {
       renderOpts.fallbackReason = "gl-error";
     }
     if (!rendered && !renderOpts.fallbackReason) renderOpts.fallbackReason = "gl-error";
+    if (rendered) shadowProbe(src, spec, renderOpts);
   }
   if (!rendered) rendered = renderBuffer(src, spec, renderOpts);
   if (options.collectStats) {
@@ -105,4 +119,19 @@ export function renderToCanvas(imageOrBitmap, spec, options = {}) {
     options.stats.fallbackReason = renderOpts.fallbackReason ?? pick.reason ?? null;
   }
   return bufferToCanvas(rendered);
+}
+
+// Periodic CPU-shadow comparison. GPU slower on 3 consecutive probes →
+// demote for the session (the plan's weak-GPU rung). The probe result is
+// discarded — it exists only to time the CPU path.
+function shadowProbe(src, spec, gpuOpts) {
+  gpuSession.rendersSinceProbe++;
+  if (gpuSession.rendersSinceProbe < SHADOW_INTERVAL) return;
+  gpuSession.rendersSinceProbe = 0;
+  const probe = { sourceWidth: gpuOpts.sourceWidth, collectStats: true };
+  renderBuffer(src, spec, probe);
+  const gpuMs = gpuOpts.stats?.ms ?? 0;
+  const cpuMs = probe.stats?.ms ?? 0;
+  gpuSession.slowerStreak = gpuMs > cpuMs ? gpuSession.slowerStreak + 1 : 0;
+  if (gpuSession.slowerStreak >= 3) gpuSession.demoted = true;
 }

@@ -90,6 +90,7 @@ export function renderBuffer(buffer, spec, options = {}) {
       fallbackReason: null,
       logical: validated.effects.length,
       passes: runs.length,
+      fusedRuns: runs.filter((r) => r.length > 1).length,
       perEffect,
     };
   }

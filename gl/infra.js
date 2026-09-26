@@ -13,7 +13,9 @@ let infra = null; // { generation, session, programs, pool }
 
 export function ensureInfra() {
   const session = acquireGLContext();
-  if (!session || session.lost) return null;
+  // isContextLost() is authoritative — the lost flag can lag the actual
+  // context state around the event-dispatch window.
+  if (!session || session.lost || session.gl.isContextLost()) return null;
   if (!infra || infra.generation !== session.generation) {
     infra?.programs?.dispose();
     infra?.pool?.dispose();

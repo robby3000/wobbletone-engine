@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>wobbletone-engine — CPU/GPU parity harness</title>
+<style>
+  body { font: 13px/1.5 ui-monospace, monospace; background: #111; color: #ddd; margin: 0; padding: 16px; }
+  h1 { font-size: 15px; }
+  table { border-collapse: collapse; margin-top: 12px; }
+  th, td { padding: 3px 10px; text-align: left; border-bottom: 1px solid #333; }
+  th { color: #888; font-weight: normal; }
+  .pass { color: #7ddf7d; }
+  .fail { color: #ff7d7d; font-weight: bold; }
+  .skip { color: #999; }
+  #summary { font-size: 14px; margin: 12px 0; }
+  button { background: #222; color: #ddd; border: 1px solid #444; padding: 6px 14px; font: inherit; cursor: pointer; }
+  #controls { display: flex; gap: 12px; align-items: center; }
+  canvas { display: none; }
+  .meta { color: #777; }
+</style>
+</head>
+<body>
+<h1>CPU / GPU parity harness</h1>
+<div id="controls">
+  <button id="run">Run parity suite</button>
+  <button id="lose">Lose GL context</button>
+  <span id="caps" class="meta"></span>
+</div>
+<div id="summary" class="meta">idle</div>
+<table id="results"><thead><tr>
+  <th>case</th><th>renderer</th><th>maxAbs</th><th>meanAbs</th><th>pct&gt;1</th><th>pct&gt;3</th><th>verdict</th>
+</tr></thead><tbody></tbody></table>
+<script type="module">
+import { renderBuffer } from "./render.js";
+import { EFFECTS } from "./registry.js";
+import { detectCapabilities, renderBufferGPU } from "./gl/index.js";
+import { seededRandom } from "./rng.js";
+
+const caps = detectCapabilities();
+document.getElementById("caps").textContent =
+  `webgl2=${caps.webgl2} highp=${caps.highpFloat} maxTex=${caps.maxTextureSize} maxUniforms=${caps.maxFragmentUniforms} sw=${caps.software} — ${caps.rendererString}`;
+
+// Deterministic test image — gradient + color patches + alpha variation,
+// sized so every effect has meaningful content.
+function makeImage(w, h) {
+  const data = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = (y * w + x) * 4;
+    data[i] = Math.round((x / w) * 255);
+    data[i + 1] = Math.round((y / h) * 255);
+    data[i + 2] = Math.round(((x + y) / (w + h)) * 255);
+    data[i + 3] = (x > w * 0.6 && y > h * 0.6) ? 160 : 255;
+    // color patches for hue effects
+    if (x < w / 3 && y < h / 3) { data[i] = 220; data[i + 1] = 60; data[i + 2] = 40; }
+    if (x > 2 * w / 3 && y < h / 3) { data[i] = 40; data[i + 1] = 80; data[i + 2] = 220; }
+  }
+  return { data, width: w, height: h };
+}
+
+const W = 640, H = 480;
+const img = makeImage(W, H);
+
+function defaultsFor(type) {
+  const out = {};
+  for (const [k, p] of Object.entries(EFFECTS[type].params || {})) out[k] = p.default;
+  return out;
+}
+const spec = (effects) => ({ format: "wobbletone-filter", version: 1, name: "parity", effects });
+
+// Tolerances from the plan's parity table.
+const TOL = {
+  "default":       { maxAbs: 1, pctOver1: 0 },
+  "blur":          { maxAbs: 6, meanAbs: 1.0, pctOver3: 1 },
+  "bloom":         { maxAbs: 6, meanAbs: 1.0, pctOver3: 1 },
+  "chromatic":     { maxAbs: 1, pctOver1: 0 },
+  "dropshadow":    { maxAbs: 6, meanAbs: 1.0, pctOver3: 1 },
+  "grain":         { maxAbs: 1, pctOver1: 0 },   // lattice bit-exact, blend ≤1
+  "glitch":        { maxAbs: 1, pctOver1: 0 },
+  "stack":         { maxAbs: 8, meanAbs: 1.5, pctOver4: 2 },
+};
+const tolFor = (type) => TOL[type] || TOL.default;
+
+function diff(a, b) {
+  let maxAbs = 0, sum = 0, over1 = 0, over3 = 0, over4 = 0;
+  const n = Math.min(a.data.length, b.data.length);
+  for (let i = 0; i < n; i++) {
+    const d = Math.abs(a.data[i] - b.data[i]);
+    if (d > maxAbs) maxAbs = d;
+    sum += d;
+    if (d > 1) over1++;
+    if (d > 3) over3++;
+    if (d > 4) over4++;
+  }
+  const pct = (x) => (x / (n / 4)) * 100;
+  return { maxAbs, meanAbs: sum / n, pctOver1: pct(over1), pctOver3: pct(over3), pctOver4: pct(over4) };
+}
+
+function verdict(type, d) {
+  const t = tolFor(type);
+  if (d.maxAbs > t.maxAbs) return false;
+  if (t.meanAbs !== undefined && d.meanAbs > t.meanAbs) return false;
+  if (t.pctOver1 !== undefined && d.pctOver1 > t.pctOver1) return false;
+  if (t.pctOver3 !== undefined && d.pctOver3 > t.pctOver3) return false;
+  if (t.pctOver4 !== undefined && d.pctOver4 > t.pctOver4) return false;
+  return true;
+}
+
+const tbody = document.querySelector("#results tbody");
+function row(name, renderer, d, ok, note = "") {
+  const tr = document.createElement("tr");
+  const cls = ok === null ? "skip" : ok ? "pass" : "fail";
+  tr.innerHTML = `<td>${name}</td><td>${renderer}</td><td>${d?.maxAbs ?? "—"}</td>` +
+    `<td>${d?.meanAbs !== undefined ? d.meanAbs.toFixed(3) : "—"}</td>` +
+    `<td>${d?.pctOver1 !== undefined ? d.pctOver1.toFixed(2) + "%" : "—"}</td>` +
+    `<td>${d?.pctOver3 !== undefined ? d.pctOver3.toFixed(2) + "%" : "—"}</td>` +
+    `<td class="${cls}">${ok === null ? "skip" : ok ? "pass" : "FAIL"} ${note}</td>`;
+  tbody.appendChild(tr);
+  return ok !== false;
+}
+
+async function run() {
+  tbody.innerHTML = "";
+  let pass = 0, fail = 0, skip = 0;
+
+  // Single effects
+  for (const type of Object.keys(EFFECTS)) {
+    const s = spec([{ type, params: defaultsFor(type) }]);
+    const gpuOpts = { collectStats: true };
+    const gpu = renderBufferGPU(img, s, gpuOpts);
+    if (!gpu) { row(type, "cpu-only", null, null, gpuOpts.fallbackReason || ""); skip++; continue; }
+    const cpu = renderBuffer(img, s, {});
+    const d = diff(cpu, gpu);
+    // Compounds expand to multi-primitive fused runs — stack tolerance.
+    const tolKey = EFFECTS[type].expand ? "stack" : type;
+    if (row(type, gpuOpts.stats?.renderer || "webgl2", d, verdict(tolKey, d))) pass++;
+    else fail++;
+    await new Promise((r) => setTimeout(r)); // keep the page responsive
+  }
+
+  // Multi-effect stacks (deterministic via seededRandom)
+  const types = Object.keys(EFFECTS).filter((t) => !["drama", "dropshadow"].includes(t));
+  const rand = seededRandom(1337);
+  for (let s = 0; s < 12; s++) {
+    const n = 3 + Math.floor(rand() * 3);
+    const effects = [];
+    for (let k = 0; k < n; k++) {
+      const type = types[Math.floor(rand() * types.length)];
+      effects.push({ type, params: defaultsFor(type) });
+    }
+    const name = `stack:${effects.map((e) => e.type).join("+")}`;
+    const sp = spec(effects);
+    const gpuOpts = { collectStats: true };
+    const gpu = renderBufferGPU(img, sp, gpuOpts);
+    if (!gpu) { row(name, "cpu-only", null, null, gpuOpts.fallbackReason || ""); skip++; continue; }
+    const cpu = renderBuffer(img, sp, {});
+    const d = diff(cpu, gpu);
+    if (row(name, "webgl2", d, verdict("stack", d))) pass++; else fail++;
+    await new Promise((r) => setTimeout(r));
+  }
+
+  document.getElementById("summary").textContent =
+    `${pass} pass, ${fail} FAIL, ${skip} cpu-only`;
+  document.getElementById("summary").className = fail ? "fail" : "pass";
+}
+
+document.getElementById("run").addEventListener("click", run);
+document.getElementById("lose").addEventListener("click", async () => {
+  // Full cycle test: lose → (renders during loss correctly fall back to
+  // CPU) → restore → auto-rerun to prove the GPU path rebuilds.
+  const s = (await import("./gl/index.js")).acquireGLContext();
+  if (!s) { alert("no GL session"); return; }
+  const summary = document.getElementById("summary");
+  summary.textContent = "context lost — renders should fall back to CPU";
+  summary.className = "meta";
+  s.gl.getExtension("WEBGL_lose_context")?.loseContext();
+  // While the context is dead, prove the fallback rung works.
+  const probeOpts = {};
+  const probe = renderBufferGPU(img, spec([{ type: "invert", params: { v: 100 } }]), probeOpts);
+  summary.textContent = probe === null
+    ? `lost: GPU correctly refused (${probeOpts.fallbackReason || "cpu fallback"}) — restoring in 400ms…`
+    : "lost: unexpected — GPU render proceeded on a lost context!";
+  setTimeout(() => {
+    s.gl.getExtension("WEBGL_lose_context")?.restoreContext();
+    summary.textContent = "restoring… (rerunning suite on restore)";
+  }, 400);
+  setTimeout(() => run(), 1000); // suite rerun proves programs rebuild
+});
+run();
+</script>
+</body>
+</html>
