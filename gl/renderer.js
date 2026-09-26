@@ -18,6 +18,7 @@ import { setUniform } from "./uniforms.js";
 import { applyBlurGPU } from "./effects/blur.js";
 import { GPU_OVERLAY_TYPES, applyOverlayGPU } from "./effects/overlay.js";
 import { applyGrainGPU, applyGlitchGPU, glitchUniformLimit } from "./effects/procedural.js";
+import { applyBloomGPU, applyChromaticGPU } from "./effects/composite.js";
 
 // Can every run of this spec render on GPU? (Shape check only —
 // param-dependent limits like blur kernel size are gated at render.)
@@ -29,6 +30,7 @@ export function canRenderGPU(spec) {
       if (run.length === 1 && run[0].type === "blur") continue;
       if (run.length === 1 && GPU_OVERLAY_TYPES.has(run[0].type)) continue;
       if (run.length === 1 && (run[0].type === "grain" || run[0].type === "glitch")) continue;
+      if (run.length === 1 && (run[0].type === "bloom" || run[0].type === "chromatic")) continue;
       return false;
     }
     return true;
@@ -108,6 +110,22 @@ export function renderBufferGPU(buffer, spec, options = {}) {
         held.push(dst);
         cur = dst;
         physicalPasses++;
+      } else if (run[0].type === "bloom" || run[0].type === "chromatic") {
+        const params = scaleParams(EFFECTS[run[0].type], run[0].params, renderScale);
+        const prepFor = (type, p) => EFFECTS[type].preparePixel ? EFFECTS[type].preparePixel(p) : p;
+        if (run[0].type === "bloom") {
+          const res = applyBloomGPU(inf, cur, params, prepFor, caps.maxFragmentUniforms);
+          if (!res) return fail(options, inf.session.lost ? "context-lost" : "shader-compile");
+          held.push(res.dst);
+          cur = res.dst;
+          physicalPasses += res.passes;
+        } else {
+          const dst = applyChromaticGPU(inf, cur, params);
+          if (!dst) return fail(options, inf.session.lost ? "context-lost" : "shader-compile");
+          held.push(dst);
+          cur = dst;
+          physicalPasses++;
+        }
       } else {
         // overlay run — one inline layer+composite draw
         const params = scaleParams(EFFECTS[run[0].type], run[0].params, renderScale);
