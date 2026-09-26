@@ -60,3 +60,43 @@ function probe() {
   } catch { /* probe context teardown is best-effort */ }
   return Object.freeze(caps);
 }
+
+// ---- rendering context ----
+//
+// One persistent hidden-canvas context for actual rendering. Context loss
+// (routine on iOS under memory pressure) is handled explicitly: the flag
+// trips on webglcontextlost, in-flight renders bail to CPU, and a restore
+// rebuilds GPU state lazily — programs/pool are recompiled on next use.
+// preventDefault() keeps the context restorable.
+
+let session = null;
+
+export function acquireGLContext() {
+  if (session && !session.gl.isContextLost()) return session;
+  if (typeof document === "undefined") return null;
+  const canvas = document.createElement("canvas");
+  const gl = canvas.getContext("webgl2", {
+    alpha: true, antialias: false, depth: false, stencil: false,
+    preserveDrawingBuffer: false,
+  });
+  if (!gl) return null;
+  session = { gl, canvas, lost: false, generation: 0, onRestore: null };
+  canvas.addEventListener("webglcontextlost", (e) => {
+    e.preventDefault();
+    session.lost = true;
+  });
+  canvas.addEventListener("webglcontextrestored", () => {
+    session.lost = false;
+    session.generation++;        // programs/pools check this and rebuild
+    session.onRestore?.(session);
+  });
+  return session;
+}
+
+export function releaseGLContext() {
+  if (!session) return;
+  try { session.gl.getExtension("WEBGL_lose_context")?.loseContext(); } catch { /* ok */ }
+  session = null;
+}
+
+export function _resetGLForTest() { session = null; cached = null; }
