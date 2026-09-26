@@ -11,7 +11,9 @@
 //   run = expanded effect entries with renderScale-scaled params.
 // canRunGPU(type) -> the effect has a GLSL step.
 
-const HELPERS = /* glsl */ `
+// Exported so other GPU shaders (glitch corrupt modes) reuse the same
+// ported helpers instead of re-deriving them.
+export const HELPERS = /* glsl */ `
 // ToUint8Clamp-equivalent: clamp 0..255, round half to EVEN.
 float rne(float x) {
   float f = floor(x);

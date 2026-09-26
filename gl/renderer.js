@@ -17,6 +17,7 @@ import { uploadBuffer, readBuffer } from "./readback.js";
 import { setUniform } from "./uniforms.js";
 import { applyBlurGPU } from "./effects/blur.js";
 import { GPU_OVERLAY_TYPES, applyOverlayGPU } from "./effects/overlay.js";
+import { applyGrainGPU, applyGlitchGPU, glitchUniformLimit } from "./effects/procedural.js";
 
 // Can every run of this spec render on GPU? (Shape check only —
 // param-dependent limits like blur kernel size are gated at render.)
@@ -27,6 +28,7 @@ export function canRenderGPU(spec) {
       if (run.every((e) => canRunGPU(e.type))) continue;
       if (run.length === 1 && run[0].type === "blur") continue;
       if (run.length === 1 && GPU_OVERLAY_TYPES.has(run[0].type)) continue;
+      if (run.length === 1 && (run[0].type === "grain" || run[0].type === "glitch")) continue;
       return false;
     }
     return true;
@@ -92,6 +94,20 @@ export function renderBufferGPU(buffer, spec, options = {}) {
           physicalPasses += 2;
         }
         // sigma <= 0: identity — skip the run entirely
+      } else if (run[0].type === "grain") {
+        const params = scaleParams(EFFECTS.grain, run[0].params, renderScale);
+        const dst = applyGrainGPU(inf, cur, params);
+        if (!dst) return fail(options, inf.session.lost ? "context-lost" : "shader-compile");
+        held.push(dst);
+        cur = dst;
+        physicalPasses++;
+      } else if (run[0].type === "glitch") {
+        const params = scaleParams(EFFECTS.glitch, run[0].params, renderScale);
+        const dst = applyGlitchGPU(inf, cur, params, renderScale);
+        if (!dst) return fail(options, inf.session.lost ? "context-lost" : "bands-over-limit");
+        held.push(dst);
+        cur = dst;
+        physicalPasses++;
       } else {
         // overlay run — one inline layer+composite draw
         const params = scaleParams(EFFECTS[run[0].type], run[0].params, renderScale);
