@@ -12,6 +12,7 @@ import { TexturePool } from "./textures.js";
 import { uploadBuffer, readBuffer } from "./readback.js";
 
 export { detectCapabilities, acquireGLContext, ProgramCache, TexturePool, uploadBuffer, readBuffer };
+export { BLEND_INDEX, BLEND_GLSL } from "./blends.js";
 
 // Passthrough fragment — uploads a buffer, draws it, reads it back.
 // Byte-identical by construction (RGBA8 unorm roundtrip); it exists to
