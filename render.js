@@ -96,7 +96,7 @@ export function renderBuffer(buffer, spec, options = {}) {
   return out;
 }
 
-function scaleParams(def, params, renderScale) {
+export function scaleParams(def, params, renderScale) {
   if (renderScale === 1) return params;
   let scaled = null;
   for (const key of Object.keys(params)) {

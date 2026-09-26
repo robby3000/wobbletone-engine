@@ -7,7 +7,7 @@
 
 import { ENGINE_VERSION } from "./version.js";
 import { renderBuffer } from "./render.js";
-import { pickRenderer } from "./gl/index.js";
+import { pickRenderer, renderBufferGPU } from "./gl/index.js";
 
 function requireDOM() {
   if (typeof document === "undefined") {
@@ -83,14 +83,26 @@ export function renderToCanvas(imageOrBitmap, spec, options = {}) {
   const w = Math.max(1, Math.round(srcW * scale));
   const h = Math.max(1, Math.round(srcH * scale));
   // Renderer selection is per render — texture-size is checked against
-  // these actual dims. G0: the GPU path is plumbed but has no shaders yet,
-  // so a resolved "webgl2" still renders CPU and notes the reason.
+  // these actual dims. GPU takes it only when the whole expanded spec is
+  // pixel-local (v1 rule); any failure falls back to the CPU render of
+  // the same spec, never a partial pipeline.
   const pick = pickRenderer({ renderer: options.renderer, width: w, height: h });
+  const src = drawToBuffer(imageOrBitmap, w, h);
   const renderOpts = { sourceWidth: srcW, collectStats: options.collectStats };
-  const rendered = renderBuffer(drawToBuffer(imageOrBitmap, w, h), spec, renderOpts);
+  let rendered = null;
+  if (pick.renderer === "webgl2") {
+    try {
+      rendered = renderBufferGPU(src, spec, renderOpts);
+    } catch (e) {
+      console.warn("[wobbletone-engine] GPU render failed, CPU fallback:", e.message);
+      renderOpts.fallbackReason = "gl-error";
+    }
+    if (!rendered && !renderOpts.fallbackReason) renderOpts.fallbackReason = "gl-error";
+  }
+  if (!rendered) rendered = renderBuffer(src, spec, renderOpts);
   if (options.collectStats) {
     options.stats = renderOpts.stats;
-    options.stats.fallbackReason = pick.renderer === "cpu" ? pick.reason : "gl-not-implemented";
+    options.stats.fallbackReason = renderOpts.fallbackReason ?? pick.reason ?? null;
   }
   return bufferToCanvas(rendered);
 }

@@ -7,12 +7,14 @@
 // dims each time (wobbletonefx sources are full-res).
 
 import { detectCapabilities, acquireGLContext } from "./context.js";
+import { ensureInfra } from "./infra.js";
 import { ProgramCache } from "./programs.js";
 import { TexturePool } from "./textures.js";
 import { uploadBuffer, readBuffer } from "./readback.js";
 
-export { detectCapabilities, acquireGLContext, ProgramCache, TexturePool, uploadBuffer, readBuffer };
+export { detectCapabilities, acquireGLContext, ensureInfra, ProgramCache, TexturePool, uploadBuffer, readBuffer };
 export { BLEND_INDEX, BLEND_GLSL } from "./blends.js";
+export { renderBufferGPU, canRenderGPU } from "./renderer.js";
 
 // Passthrough fragment — uploads a buffer, draws it, reads it back.
 // Byte-identical by construction (RGBA8 unorm roundtrip); it exists to
@@ -24,24 +26,6 @@ uniform sampler2D uSrc;
 in vec2 vUv;
 out vec4 fragColor;
 void main() { fragColor = texture(uSrc, vUv); }`;
-
-let infra = null; // { session, programs, pool } — rebuilt on context restore
-
-function ensureInfra() {
-  const session = acquireGLContext();
-  if (!session || session.lost) return null;
-  if (!infra || infra.generation !== session.generation) {
-    infra?.programs?.dispose();
-    infra?.pool?.dispose();
-    infra = {
-      generation: session.generation,
-      session,
-      programs: new ProgramCache(session.gl),
-      pool: new TexturePool(session.gl),
-    };
-  }
-  return infra;
-}
 
 // Returns the same pixels back through the GPU, or null if unavailable.
 export function gpuPassthrough(buffer) {
