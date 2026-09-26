@@ -7,6 +7,7 @@
 
 import { ENGINE_VERSION } from "./version.js";
 import { renderBuffer } from "./render.js";
+import { pickRenderer } from "./gl/index.js";
 
 function requireDOM() {
   if (typeof document === "undefined") {
@@ -81,8 +82,15 @@ export function renderToCanvas(imageOrBitmap, spec, options = {}) {
   const scale = options.maxDim ? Math.min(1, options.maxDim / Math.max(srcW, srcH)) : 1;
   const w = Math.max(1, Math.round(srcW * scale));
   const h = Math.max(1, Math.round(srcH * scale));
+  // Renderer selection is per render — texture-size is checked against
+  // these actual dims. G0: the GPU path is plumbed but has no shaders yet,
+  // so a resolved "webgl2" still renders CPU and notes the reason.
+  const pick = pickRenderer({ renderer: options.renderer, width: w, height: h });
   const renderOpts = { sourceWidth: srcW, collectStats: options.collectStats };
   const rendered = renderBuffer(drawToBuffer(imageOrBitmap, w, h), spec, renderOpts);
-  if (options.collectStats) options.stats = renderOpts.stats;
+  if (options.collectStats) {
+    options.stats = renderOpts.stats;
+    options.stats.fallbackReason = pick.renderer === "cpu" ? pick.reason : "gl-not-implemented";
+  }
   return bufferToCanvas(rendered);
 }

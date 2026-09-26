@@ -86,6 +86,8 @@ export function renderBuffer(buffer, spec, options = {}) {
   if (collect) {
     options.stats = {
       ms: performance.now() - t0,
+      renderer: "cpu",
+      fallbackReason: null,
       logical: validated.effects.length,
       passes: runs.length,
       perEffect,
