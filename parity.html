@@ -31,7 +31,7 @@
   <th>case</th><th>renderer</th><th>maxAbs</th><th>meanAbs</th><th>pct&gt;1</th><th>pct&gt;3</th><th>verdict</th>
 </tr></thead><tbody></tbody></table>
 <script type="module">
-import { renderBuffer } from "./render.js";
+import { renderBuffer, expandEffects } from "./render.js";
 import { EFFECTS } from "./registry.js";
 import { detectCapabilities, renderBufferGPU } from "./gl/index.js";
 import { seededRandom } from "./rng.js";
@@ -95,25 +95,37 @@ function diff(a, b) {
   return { maxAbs, meanAbs: sum / n, pctOver1: pct(over1), pctOver3: pct(over3), pctOver4: pct(over4) };
 }
 
-function verdict(type, d) {
+// Quantizing ops flip whole output buckets at band boundaries — fp32 lands
+// isolated pixels on the other side, so maxAbs spikes are expected on
+// stacks containing them. pct/meanAbs remain the hard gates; maxAbs is
+// informational there (a "boundary" pass notes it in the verdict column).
+const DISCONTINUOUS = new Set(["posterize", "solarize", "hueband"]);
+
+function verdict(type, d, specTypes = []) {
   const t = tolFor(type);
-  if (d.maxAbs > t.maxAbs) return false;
-  if (t.meanAbs !== undefined && d.meanAbs > t.meanAbs) return false;
-  if (t.pctOver1 !== undefined && d.pctOver1 > t.pctOver1) return false;
-  if (t.pctOver3 !== undefined && d.pctOver3 > t.pctOver3) return false;
-  if (t.pctOver4 !== undefined && d.pctOver4 > t.pctOver4) return false;
-  return true;
+  const boundary = type === "stack" &&
+    specTypes.some((x) => DISCONTINUOUS.has(x)) &&
+    d.pctOver3 <= 1;
+  if (d.maxAbs > t.maxAbs && !boundary) return { ok: false };
+  if (t.meanAbs !== undefined && d.meanAbs > t.meanAbs) return { ok: false };
+  if (t.pctOver1 !== undefined && d.pctOver1 > t.pctOver1) return { ok: false };
+  if (t.pctOver3 !== undefined && d.pctOver3 > t.pctOver3) return { ok: false };
+  if (t.pctOver4 !== undefined && d.pctOver4 > t.pctOver4) return { ok: false };
+  return d.maxAbs > t.maxAbs
+    ? { ok: true, note: `(boundary — ${d.maxAbs} max at ${d.pctOver3.toFixed(2)}% px)` }
+    : { ok: true };
 }
 
 const tbody = document.querySelector("#results tbody");
-function row(name, renderer, d, ok, note = "") {
+function row(name, renderer, d, v, note = "") {
+  const ok = v === null ? null : v.ok;
   const tr = document.createElement("tr");
   const cls = ok === null ? "skip" : ok ? "pass" : "fail";
   tr.innerHTML = `<td>${name}</td><td>${renderer}</td><td>${d?.maxAbs ?? "—"}</td>` +
     `<td>${d?.meanAbs !== undefined ? d.meanAbs.toFixed(3) : "—"}</td>` +
     `<td>${d?.pctOver1 !== undefined ? d.pctOver1.toFixed(2) + "%" : "—"}</td>` +
     `<td>${d?.pctOver3 !== undefined ? d.pctOver3.toFixed(2) + "%" : "—"}</td>` +
-    `<td class="${cls}">${ok === null ? "skip" : ok ? "pass" : "FAIL"} ${note}</td>`;
+    `<td class="${cls}">${ok === null ? "skip" : ok ? "pass" : "FAIL"} ${note || v?.note || ""}</td>`;
   tbody.appendChild(tr);
   return ok !== false;
 }
@@ -132,7 +144,8 @@ async function run() {
     const d = diff(cpu, gpu);
     // Compounds expand to multi-primitive fused runs — stack tolerance.
     const tolKey = EFFECTS[type].expand ? "stack" : type;
-    if (row(type, gpuOpts.stats?.renderer || "webgl2", d, verdict(tolKey, d))) pass++;
+    const primTypes = expandEffects(s.effects).map((e) => e.type);
+    if (row(type, gpuOpts.stats?.renderer || "webgl2", d, verdict(tolKey, d, primTypes))) pass++;
     else fail++;
     await new Promise((r) => setTimeout(r)); // keep the page responsive
   }
@@ -154,7 +167,8 @@ async function run() {
     if (!gpu) { row(name, "cpu-only", null, null, gpuOpts.fallbackReason || ""); skip++; continue; }
     const cpu = renderBuffer(img, sp, {});
     const d = diff(cpu, gpu);
-    if (row(name, "webgl2", d, verdict("stack", d))) pass++; else fail++;
+    const primTypes = expandEffects(effects).map((e) => e.type);
+    if (row(name, "webgl2", d, verdict("stack", d, primTypes))) pass++; else fail++;
     await new Promise((r) => setTimeout(r));
   }
 
