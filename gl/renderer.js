@@ -14,7 +14,9 @@ import { ensureInfra } from "./infra.js";
 import { detectCapabilities } from "./context.js";
 import { buildFusedRun, canRunGPU } from "./fusion.js";
 import { uploadBuffer, readBuffer } from "./readback.js";
+import { setUniform } from "./uniforms.js";
 import { applyBlurGPU } from "./effects/blur.js";
+import { GPU_OVERLAY_TYPES, applyOverlayGPU } from "./effects/overlay.js";
 
 // Can every run of this spec render on GPU? (Shape check only —
 // param-dependent limits like blur kernel size are gated at render.)
@@ -24,6 +26,7 @@ export function canRenderGPU(spec) {
     for (const run of planRuns(effects)) {
       if (run.every((e) => canRunGPU(e.type))) continue;
       if (run.length === 1 && run[0].type === "blur") continue;
+      if (run.length === 1 && GPU_OVERLAY_TYPES.has(run[0].type)) continue;
       return false;
     }
     return true;
@@ -78,10 +81,8 @@ export function renderBufferGPU(buffer, spec, options = {}) {
         drawInto(gl, inf, prog, cur, dst);
         cur = dst;
         physicalPasses++;
-      } else {
-        // single-effect non-local run — currently only blur
-        const e = run[0];
-        const params = scaleParams(EFFECTS[e.type], e.params, renderScale);
+      } else if (run[0].type === "blur") {
+        const params = scaleParams(EFFECTS.blur, run[0].params, renderScale);
         if (params.v > 0) {
           if (!blurFitsGPU(params.v, caps)) return fail(options, "kernel-too-large");
           const dst = applyBlurGPU(inf, cur, params.v, caps.maxFragmentUniforms);
@@ -91,6 +92,14 @@ export function renderBufferGPU(buffer, spec, options = {}) {
           physicalPasses += 2;
         }
         // sigma <= 0: identity — skip the run entirely
+      } else {
+        // overlay run — one inline layer+composite draw
+        const params = scaleParams(EFFECTS[run[0].type], run[0].params, renderScale);
+        const dst = applyOverlayGPU(inf, cur, { type: run[0].type, params });
+        if (!dst) return fail(options, inf.session.lost ? "context-lost" : "unsupported-effect");
+        held.push(dst);
+        cur = dst;
+        physicalPasses++;
       }
       if (options.collectStats) perEffect.push({ type: run.map((e) => e.type).join("+"), ms: performance.now() - e0 });
       if (gl.isContextLost()) return fail(options, "context-lost");
@@ -139,13 +148,3 @@ function collectTimer(options) {
   return options.collectStats ? performance.now() : 0;
 }
 
-function setUniform(gl, prog, { name, type, value }) {
-  const loc = gl.getUniformLocation(prog, name);
-  if (!loc) return;
-  switch (type) {
-    case "float": gl.uniform1f(loc, value); break;
-    case "int": gl.uniform1i(loc, value); break;
-    case "vec3": gl.uniform3f(loc, value[0], value[1], value[2]); break;
-    case "vec3[]": gl.uniform3fv(loc, value); break;
-  }
-}
