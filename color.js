@@ -9,6 +9,16 @@ export const BLEND_MODES = [
 
 export const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
+// Quantize exactly like a Uint8ClampedArray write (ToUint8Clamp: clamp to
+// 0–255, round half to EVEN — not Math.round's half-up). applyPixel
+// implementations write through this so a fused run stays byte-identical
+// to the same effects applied one buffer-walk each.
+const _q8 = new Uint8ClampedArray(1);
+export function q8(v) {
+  _q8[0] = v;
+  return _q8[0];
+}
+
 export function lerpByte(start, end, amount) {
   return clamp(Math.round(start + (end - start) * amount), 0, 255);
 }

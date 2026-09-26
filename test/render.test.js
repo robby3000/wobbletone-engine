@@ -89,7 +89,7 @@ test("ctx.renderScale reaches effects with derived px (glitch)", () => {
   assert.notDeepEqual([...a.data], [...b.data]);
 });
 
-test("collectStats fills {ms, passes, perEffect}", () => {
+test("collectStats fills {ms, logical, passes, perEffect}; pixel-local effects fuse", () => {
   const spec = createSpec([
     { type: "invert", params: { v: 100 } },
     { type: "sepia", params: { v: 50 } },
@@ -98,11 +98,23 @@ test("collectStats fills {ms, passes, perEffect}", () => {
   renderBuffer(filled([10, 20, 30, 255], 8, 8), spec, options);
   const s = options.stats;
   assert.ok(s.ms >= 0);
-  assert.equal(s.passes, 2);
-  assert.equal(s.perEffect.length, 2);
-  assert.equal(s.perEffect[0].type, "invert");
-  assert.equal(s.perEffect[1].type, "sepia");
+  // invert + sepia are pixel-local: 2 logical effects, 1 physical pass.
+  assert.equal(s.logical, 2);
+  assert.equal(s.passes, 1);
+  assert.equal(s.perEffect.length, 1);
+  assert.equal(s.perEffect[0].type, "invert+sepia");
   assert.ok(s.perEffect.every((e) => e.ms >= 0));
+});
+
+test("fuse:false keeps one pass per effect", () => {
+  const spec = createSpec([
+    { type: "invert", params: { v: 100 } },
+    { type: "sepia", params: { v: 50 } },
+  ]);
+  const options = { collectStats: true, fuse: false };
+  renderBuffer(filled([10, 20, 30, 255], 8, 8), spec, options);
+  assert.equal(options.stats.passes, 2);
+  assert.equal(options.stats.perEffect.length, 2);
 });
 
 test("empty spec returns an unchanged clone", () => {

@@ -9,10 +9,43 @@
 // (glitch displacement).
 //
 // The input buffer is NOT mutated — a clone is rendered and returned.
+//
+// Dispatch pipeline:
+//   1. expandEffects — compounds splice their primitive recipe in
+//   2. planRuns — consecutive pixelLocal effects group into fused runs
+//   3. each run = one buffer pass (mapPixels for fused, apply otherwise)
+// options.fuse === false keeps one pass per expanded effect (debug/parity).
 
-import { cloneBuffer } from "./buffer.js";
+import { cloneBuffer, mapPixels } from "./buffer.js";
 import { validateSpec } from "./spec.js";
 import { EFFECTS } from "./registry.js";
+
+// Splice compound expansions (registry `expand: params → effects[]`) into
+// the stream. Expanded params are unscaled spec values — px scaling happens
+// per-effect at dispatch like any other entry.
+export function expandEffects(effects) {
+  const out = [];
+  for (const e of effects) {
+    const def = EFFECTS[e.type];
+    if (def && typeof def.expand === "function") out.push(...def.expand(e.params));
+    else out.push(e);
+  }
+  return out;
+}
+
+// Group expanded effects into dispatch units: maximal runs of consecutive
+// pixelLocal effects share one pass; anything else is a run boundary.
+// Exported for hosts that render/cache per unit (wobbletonefx incremental
+// preview, the GPU pass planner).
+export function planRuns(effects) {
+  const runs = [];
+  for (const e of expandEffects(effects)) {
+    const last = runs[runs.length - 1];
+    if (last && EFFECTS[e.type]?.pixelLocal && EFFECTS[last[0].type]?.pixelLocal) last.push(e);
+    else runs.push([e]);
+  }
+  return runs;
+}
 
 export function renderBuffer(buffer, spec, options = {}) {
   const validated = validateSpec(spec);
@@ -25,19 +58,38 @@ export function renderBuffer(buffer, spec, options = {}) {
   const perEffect = [];
   const t0 = performance.now();
 
-  for (const effect of validated.effects) {
-    const def = EFFECTS[effect.type];
-    if (typeof def.apply !== "function") {
-      throw new Error(`renderBuffer: effect "${effect.type}" has no renderer`);
-    }
-    const params = scaleParams(def, effect.params, renderScale);
+  const runs = options.fuse === false
+    ? expandEffects(validated.effects).map((e) => [e])
+    : planRuns(validated.effects);
+
+  for (const run of runs) {
+    const def = EFFECTS[run[0].type];
     const e0 = collect ? performance.now() : 0;
-    def.apply(out, params, ctx);
-    if (collect) perEffect.push({ type: effect.type, ms: performance.now() - e0 });
+    if (def.pixelLocal) {
+      const steps = run.map((e) => {
+        const params = scaleParams(EFFECTS[e.type], e.params, renderScale);
+        const pre = EFFECTS[e.type].preparePixel
+          ? EFFECTS[e.type].preparePixel(params)
+          : params;
+        return (px) => EFFECTS[e.type].applyPixel(px, pre);
+      });
+      mapPixels(out, steps);
+    } else {
+      if (typeof def.apply !== "function") {
+        throw new Error(`renderBuffer: effect "${run[0].type}" has no renderer`);
+      }
+      def.apply(out, scaleParams(def, run[0].params, renderScale), ctx);
+    }
+    if (collect) perEffect.push({ type: run.map((e) => e.type).join("+"), ms: performance.now() - e0 });
   }
 
   if (collect) {
-    options.stats = { ms: performance.now() - t0, passes: validated.effects.length, perEffect };
+    options.stats = {
+      ms: performance.now() - t0,
+      logical: validated.effects.length,
+      passes: runs.length,
+      perEffect,
+    };
   }
   return out;
 }

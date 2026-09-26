@@ -26,16 +26,26 @@ const num = (min, max, def, opts = {}) => ({ kind: "number", min, max, default: 
 const sel = (options, def) => ({ kind: "select", options, default: def });
 const col = (def) => ({ kind: "color", default: def });
 
+// pixelLocal marks effects whose output at (x,y) depends only on the input
+// at (x,y) — no neighbours, no generated layers. They carry applyPixel
+// (per-pixel step over a mutable [r,g,b,a] slot, quantized via q8) and an
+// optional preparePixel (params → hoisted constants). render.js fuses
+// consecutive pixelLocal effects into one pass; the same flag drives GPU
+// run grouping in gl/fusion.js. drama is NOT pixel-local (internal blur).
+
 export const EFFECTS = {
   /* ---- pointwise ---- */
-  brightness: { category: "pointwise", apply: pointwise.brightness, params: { v: num(0, 200, 110, { unit: "%" }) } },
-  contrast: { category: "pointwise", apply: pointwise.contrast, params: { v: num(0, 200, 110, { unit: "%" }) } },
-  saturate: { category: "pointwise", apply: pointwise.saturate, params: { v: num(0, 300, 120, { unit: "%" }) } },
-  hue: { category: "pointwise", apply: pointwise.hue, params: { v: num(0, 360, 0, { unit: "°" }) } },
-  sepia: { category: "pointwise", apply: pointwise.sepia, params: { v: num(0, 100, 60, { unit: "%" }) } },
+  brightness: { category: "pointwise", apply: pointwise.brightness, pixelLocal: true, applyPixel: pointwise.brightnessPixel, preparePixel: pointwise.brightnessPrepare, params: { v: num(0, 200, 110, { unit: "%" }) } },
+  contrast: { category: "pointwise", apply: pointwise.contrast, pixelLocal: true, applyPixel: pointwise.contrastPixel, preparePixel: pointwise.contrastPrepare, params: { v: num(0, 200, 110, { unit: "%" }) } },
+  saturate: { category: "pointwise", apply: pointwise.saturate, pixelLocal: true, applyPixel: pointwise.saturatePixel, preparePixel: pointwise.saturatePrepare, params: { v: num(0, 300, 120, { unit: "%" }) } },
+  hue: { category: "pointwise", apply: pointwise.hue, pixelLocal: true, applyPixel: pointwise.huePixel, preparePixel: pointwise.huePrepare, params: { v: num(0, 360, 0, { unit: "°" }) } },
+  sepia: { category: "pointwise", apply: pointwise.sepia, pixelLocal: true, applyPixel: pointwise.sepiaPixel, preparePixel: pointwise.sepiaPrepare, params: { v: num(0, 100, 60, { unit: "%" }) } },
   grayscale: {
     category: "pointwise",
     apply: pointwise.grayscale,
+    pixelLocal: true,
+    applyPixel: pointwise.grayscalePixel,
+    preparePixel: pointwise.grayscalePrepare,
     params: {
       exposure: num(-100, 100, 0),
       contrast: num(-100, 100, 0),
@@ -45,8 +55,8 @@ export const EFFECTS = {
       intensity: num(0, 100, 50, { unit: "%" }),
     },
   },
-  invert: { category: "pointwise", apply: pointwise.invert, params: { v: num(0, 100, 100, { unit: "%" }) } },
-  opacity: { category: "pointwise", apply: pointwise.opacity, params: { v: num(0, 100, 80, { unit: "%" }) } },
+  invert: { category: "pointwise", apply: pointwise.invert, pixelLocal: true, applyPixel: pointwise.invertPixel, preparePixel: pointwise.invertPrepare, params: { v: num(0, 100, 100, { unit: "%" }) } },
+  opacity: { category: "pointwise", apply: pointwise.opacity, pixelLocal: true, applyPixel: pointwise.opacityPixel, preparePixel: pointwise.opacityPrepare, params: { v: num(0, 100, 80, { unit: "%" }) } },
 
   /* ---- neighbourhood ---- */
   blur: { category: "neighbourhood", apply: blurFx.blur, params: { v: num(0, 20, 1, { unit: "px", px: true }) } },
@@ -55,28 +65,43 @@ export const EFFECTS = {
   duotone: {
     category: "tone",
     apply: tone.duotone,
+    pixelLocal: true,
+    applyPixel: tone.duotonePixel,
+    preparePixel: tone.duotonePrepare,
     params: { shadow: col("#1a0d3d"), highlight: col("#ff5c8a"), contrast: num(0, 100, 20, { unit: "%" }) },
   },
   tritone: {
     category: "tone",
     apply: tone.tritone,
+    pixelLocal: true,
+    applyPixel: tone.tritonePixel,
+    preparePixel: tone.tritonePrepare,
     params: { shadow: col("#0b1d3a"), mid: col("#c44d4d"), highlight: col("#ffe8a3") },
   },
-  posterize: { category: "tone", apply: tone.posterize, params: { steps: num(2, 16, 5) } },
+  posterize: { category: "tone", apply: tone.posterize, pixelLocal: true, applyPixel: tone.posterizePixel, preparePixel: tone.posterizePrepare, params: { steps: num(2, 16, 5) } },
   solarize: {
     category: "tone",
     apply: tone.solarize,
+    pixelLocal: true,
+    applyPixel: tone.solarizePixel,
+    preparePixel: tone.solarizePrepare,
     params: { amount: num(0, 100, 60, { unit: "%" }), threshold: num(0, 100, 50, { unit: "%" }) },
   },
   hueband: {
     category: "tone",
     apply: tone.hueband,
+    pixelLocal: true,
+    applyPixel: tone.huebandPixel,
+    preparePixel: tone.huebandPrepare,
     params: { bands: num(2, 16, 6), spread: num(0, 100, 0, { unit: "%" }) },
   },
-  heatmap: { category: "tone", apply: tone.heatmap, params: { intensity: num(0, 100, 100, { unit: "%" }) } },
+  heatmap: { category: "tone", apply: tone.heatmap, pixelLocal: true, applyPixel: tone.heatmapPixel, preparePixel: tone.heatmapPrepare, params: { intensity: num(0, 100, 100, { unit: "%" }) } },
   shadowshighlights: {
     category: "tone",
     apply: tone.shadowshighlights,
+    pixelLocal: true,
+    applyPixel: tone.shadowshighlightsPixel,
+    preparePixel: tone.shadowshighlightsPrepare,
     params: { shadows: num(-100, 100, 40, { unit: "%" }), highlights: num(-100, 100, -20, { unit: "%" }) },
   },
   drama: {
@@ -215,6 +240,7 @@ export const EFFECTS = {
   psychedelic: {
     category: "compound",
     apply: compoundFx.psychedelic,
+    expand: compoundFx.expandPsychedelic,
     params: {
       saturate: num(100, 500, 280, { unit: "%" }),
       contrast: num(80, 200, 130, { unit: "%" }),
@@ -225,11 +251,13 @@ export const EFFECTS = {
   infrared: {
     category: "compound",
     apply: compoundFx.infrared,
+    expand: compoundFx.expandInfrared,
     params: { intensity: num(0, 100, 70, { unit: "%" }) },
   },
   vintage: {
     category: "compound",
     apply: compoundFx.vintage,
+    expand: compoundFx.expandVintage,
     params: {
       sepia: num(0, 100, 45, { unit: "%" }),
       contrast: num(60, 140, 95, { unit: "%" }),
@@ -240,3 +268,7 @@ export const EFFECTS = {
 };
 
 export const EFFECT_TYPES = Object.keys(EFFECTS);
+
+// Pixel-local predicate — the shared grouping rule for CPU pass fusion
+// (render.js planRuns) and the GPU pass planner (gl/fusion.js, G3).
+export const isPixelLocal = (type) => Boolean(EFFECTS[type]?.pixelLocal);

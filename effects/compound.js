@@ -34,3 +34,38 @@ export function psychedelic(buffer, params) {
   if (params.bands >= 2) hueband(buffer, { bands: Math.round(params.bands), spread: 0 });
   return buffer;
 }
+
+/* ---------- spec-level expansion ----------
+// The functions above stay as the readable imperative reference (and the
+// compound.test.js equivalence target). render.js splices the spec-level
+// expansions below into the effect list before dispatch — the expanded
+// primitives then fuse into a single pixel pass with their neighbours,
+// and G7's GPU planner consumes the same expansion. */
+
+export function expandInfrared(params) {
+  const i = (params.intensity ?? 0) / 100;
+  return [
+    { type: "invert", params: { v: i * 100 } },
+    { type: "hue", params: { v: 180 * i } },
+    { type: "saturate", params: { v: 120 + 80 * i } },
+  ];
+}
+
+export function expandVintage(params) {
+  return [
+    { type: "sepia", params: { v: params.sepia } },
+    { type: "contrast", params: { v: params.contrast } },
+    { type: "saturate", params: { v: params.saturate } },
+    { type: "brightness", params: { v: params.brightness } },
+  ];
+}
+
+export function expandPsychedelic(params) {
+  const fx = [
+    { type: "saturate", params: { v: params.saturate } },
+    { type: "contrast", params: { v: params.contrast } },
+  ];
+  if (params.solarize > 0) fx.push({ type: "solarize", params: { amount: params.solarize, threshold: 50 } });
+  if (params.bands >= 2) fx.push({ type: "hueband", params: { bands: Math.round(params.bands), spread: 0 } });
+  return fx;
+}

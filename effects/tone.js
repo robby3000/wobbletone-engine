@@ -5,9 +5,11 @@
 // (The SVG builder functions are not ported — SVG is a removed render path,
 // not part of the semantic model.)
 
-import { clamp, lerpByte, hexToRgb, rgbToHsl, hslToRgb } from "../color.js";
+import { clamp, q8, lerpByte, hexToRgb, rgbToHsl, hslToRgb } from "../color.js";
 import { gaussianBlur } from "./blur.js";
-import { cloneBuffer } from "../buffer.js";
+import { cloneBuffer, mapPixels } from "../buffer.js";
+
+const runStep = (buffer, step) => mapPixels(buffer, [step]);
 
 /* ---------- shared gradient-map machinery ---------- */
 
@@ -19,39 +21,49 @@ export function mapPixelColor(value, colors) {
   return colors[lower].map((channel, index) => lerpByte(channel, colors[upper][index], amount));
 }
 
+function gradientMapPixel(px, colors) {
+  const luminance = (0.299 * px[0] + 0.587 * px[1] + 0.114 * px[2]) / 255;
+  const mapped = mapPixelColor(luminance, colors);
+  px[0] = mapped[0];
+  px[1] = mapped[1];
+  px[2] = mapped[2];
+}
+
 function gradientMap(buffer, colors) {
-  const data = buffer.data;
-  for (let i = 0; i < data.length; i += 4) {
-    const luminance = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) / 255;
-    const mapped = mapPixelColor(luminance, colors);
-    data[i] = mapped[0];
-    data[i + 1] = mapped[1];
-    data[i + 2] = mapped[2];
-  }
-  return buffer;
+  return runStep(buffer, (px) => gradientMapPixel(px, colors));
 }
 
 /* ---------- duotone / tritone / heatmap ---------- */
 
-export function duotone(buffer, params) {
+export function duotonePrepare(params) {
   const shadow = hexToRgb(params.shadow);
   const highlight = hexToRgb(params.highlight);
   const contrast = 1 + params.contrast / 100;
-  const colors = [shadow, highlight.map((value) => clamp(Math.round((value - 127.5) * contrast + 127.5), 0, 255))];
-  return gradientMap(buffer, colors);
+  return [shadow, highlight.map((value) => clamp(Math.round((value - 127.5) * contrast + 127.5), 0, 255))];
+}
+export function duotonePixel(px, colors) { gradientMapPixel(px, colors); }
+export function duotone(buffer, params) {
+  return gradientMap(buffer, duotonePrepare(params));
 }
 
+export function tritonePrepare(params) {
+  return [hexToRgb(params.shadow), hexToRgb(params.mid), hexToRgb(params.highlight)];
+}
+export function tritonePixel(px, colors) { gradientMapPixel(px, colors); }
 export function tritone(buffer, params) {
-  return gradientMap(buffer, [hexToRgb(params.shadow), hexToRgb(params.mid), hexToRgb(params.highlight)]);
+  return gradientMap(buffer, tritonePrepare(params));
 }
 
-export function heatmap(buffer, params) {
+export function heatmapPrepare(params) {
   const intensity = params.intensity / 100;
-  const colors = [
+  return [
     [0.02, 0, 0.15], [0.1, 0, 0.4], [0.35, 0.05, 0.55],
     [0.7, 0.25, 0.1], [0.95, 0.7, 0.05], [1, 1, 0.9],
   ].map((color) => color.map((value) => Math.round(value * intensity * 255)));
-  return gradientMap(buffer, colors);
+}
+export function heatmapPixel(px, colors) { gradientMapPixel(px, colors); }
+export function heatmap(buffer, params) {
+  return gradientMap(buffer, heatmapPrepare(params));
 }
 
 /* ---------- posterize ---------- */
@@ -61,33 +73,36 @@ export function posterizeByte(value, steps) {
   return Math.round(band / (steps - 1) * 255);
 }
 
+export function posterizePrepare(params) {
+  return clamp(Math.round(params.steps), 2, 16);
+}
+export function posterizePixel(px, steps) {
+  px[0] = posterizeByte(px[0], steps);
+  px[1] = posterizeByte(px[1], steps);
+  px[2] = posterizeByte(px[2], steps);
+}
 export function posterize(buffer, params) {
-  const steps = clamp(Math.round(params.steps), 2, 16);
-  const data = buffer.data;
-  for (let i = 0; i < data.length; i += 4) {
-    data[i] = posterizeByte(data[i], steps);
-    data[i + 1] = posterizeByte(data[i + 1], steps);
-    data[i + 2] = posterizeByte(data[i + 2], steps);
-  }
-  return buffer;
+  const steps = posterizePrepare(params);
+  return runStep(buffer, (px) => posterizePixel(px, steps));
 }
 
 /* ---------- solarize ---------- */
 
 // Classic darkroom solarization: tones above `threshold` invert
 // (v → 255 − v), mixed back toward the original by `amount`.
-export function solarize(buffer, params) {
-  const threshold = (params.threshold / 100) * 255;
-  const mix = params.amount / 100;
-  const data = buffer.data;
-  for (let i = 0; i < data.length; i += 4) {
-    for (let c = 0; c < 3; c++) {
-      const v = data[i + c];
-      const s = v <= threshold ? v : 255 - v;
-      data[i + c] = clamp(Math.round(v + (s - v) * mix), 0, 255);
-    }
+export function solarizePrepare(params) {
+  return { threshold: (params.threshold / 100) * 255, mix: params.amount / 100 };
+}
+export function solarizePixel(px, p) {
+  for (let c = 0; c < 3; c++) {
+    const v = px[c];
+    const s = v <= p.threshold ? v : 255 - v;
+    px[c] = clamp(Math.round(v + (s - v) * p.mix), 0, 255);
   }
-  return buffer;
+}
+export function solarize(buffer, params) {
+  const pre = solarizePrepare(params);
+  return runStep(buffer, (px) => solarizePixel(px, pre));
 }
 
 /* ---------- hueband ---------- */
@@ -96,22 +111,23 @@ export function solarize(buffer, params) {
 // equal-width buckets, preserving saturation and lightness. `spread`
 // progressively rotates successive bands around the wheel — at 0 the bands
 // sit at their centres, higher values push neighbouring hues apart.
-export function hueband(buffer, params) {
+export function huebandPrepare(params) {
   const bands = Math.max(2, Math.round(params.bands));
-  const spread = params.spread / 100;
-  const seg = 360 / bands;
-  const data = buffer.data;
-  for (let i = 0; i < data.length; i += 4) {
-    const [h, s, l] = rgbToHsl(data[i], data[i + 1], data[i + 2]);
-    if (s === 0) continue;
-    const band = Math.floor(h / seg);
-    const h2 = ((band + 0.5) * seg + band * spread * seg) % 360;
-    const [r, g, b] = hslToRgb(h2, s, l);
-    data[i] = r;
-    data[i + 1] = g;
-    data[i + 2] = b;
-  }
-  return buffer;
+  return { spread: params.spread / 100, seg: 360 / bands };
+}
+export function huebandPixel(px, p) {
+  const [h, s, l] = rgbToHsl(px[0], px[1], px[2]);
+  if (s === 0) return;
+  const band = Math.floor(h / p.seg);
+  const h2 = ((band + 0.5) * p.seg + band * p.spread * p.seg) % 360;
+  const [r, g, b] = hslToRgb(h2, s, l);
+  px[0] = r;
+  px[1] = g;
+  px[2] = b;
+}
+export function hueband(buffer, params) {
+  const pre = huebandPrepare(params);
+  return runStep(buffer, (px) => huebandPixel(px, pre));
 }
 
 /* ---------- shadows / highlights ---------- */
@@ -119,21 +135,22 @@ export function hueband(buffer, params) {
 // Region-weighted tonal adjustment. The shadow mask (1 − l/0.5)² peaks at
 // black and fades out at mid-gray; the highlight mask mirrors it. Deltas are
 // additive per channel, scaled by the masks — smooth, monotonic, cheap.
+export function shadowshighlightsPrepare(params) {
+  return { sAmt: (params.shadows / 100) * 140, hAmt: (params.highlights / 100) * 140 };
+}
+export function shadowshighlightsPixel(px, p) {
+  const l = (0.299 * px[0] + 0.587 * px[1] + 0.114 * px[2]) / 255;
+  const ws = l < 0.5 ? (1 - l / 0.5) * (1 - l / 0.5) : 0;
+  const wh = l > 0.5 ? ((l - 0.5) / 0.5) * ((l - 0.5) / 0.5) : 0;
+  const delta = p.sAmt * ws + p.hAmt * wh;
+  if (delta === 0) return;
+  px[0] = clamp(Math.round(px[0] + delta), 0, 255);
+  px[1] = clamp(Math.round(px[1] + delta), 0, 255);
+  px[2] = clamp(Math.round(px[2] + delta), 0, 255);
+}
 export function shadowshighlights(buffer, params) {
-  const sAmt = (params.shadows / 100) * 140;
-  const hAmt = (params.highlights / 100) * 140;
-  const data = buffer.data;
-  for (let i = 0; i < data.length; i += 4) {
-    const l = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) / 255;
-    const ws = l < 0.5 ? (1 - l / 0.5) * (1 - l / 0.5) : 0;
-    const wh = l > 0.5 ? ((l - 0.5) / 0.5) * ((l - 0.5) / 0.5) : 0;
-    const delta = sAmt * ws + hAmt * wh;
-    if (delta === 0) continue;
-    data[i] = clamp(Math.round(data[i] + delta), 0, 255);
-    data[i + 1] = clamp(Math.round(data[i + 1] + delta), 0, 255);
-    data[i + 2] = clamp(Math.round(data[i + 2] + delta), 0, 255);
-  }
-  return buffer;
+  const pre = shadowshighlightsPrepare(params);
+  return runStep(buffer, (px) => shadowshighlightsPixel(px, pre));
 }
 
 /* ---------- drama ---------- */
