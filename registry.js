@@ -237,6 +237,7 @@ export const EFFECTS = {
       bandSize: num(1, 100, 28, { unit: "%" }),
       split: num(0, 30, 6, { unit: "px", px: true }),
       corrupt: num(0, 100, 40, { unit: "%" }),
+      blocks: num(0, 100, 0, { unit: "%" }),
       seed: num(1, 9999, 317),
     },
   },

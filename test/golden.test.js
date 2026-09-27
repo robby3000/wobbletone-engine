@@ -40,6 +40,7 @@ const EXPECTED = {
   "morphology": "f9ec87b5",
   "outline": "7d3b14ef",
   "echo": "966cb3e5",
+  "glitch-blocks": "f0e405f4",
   "infrared": "be274bdf",
   "vintage": "7e9c8e37",
   "psychedelic": "ec999b06",

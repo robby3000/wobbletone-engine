@@ -108,6 +108,7 @@ export const CASES = [
   ["prism", "gradient", [{ type: "prism", params: { c1: "#ff2e88", c2: "#2effd5", angle: 60, width: 30, opacity: 45 } }]],
   ["grain", "portrait", [{ type: "grain", params: { size: 1.2, opacity: 35, blend: "overlay", seed: 11 } }]],
   ["glitch", "checker", [{ type: "glitch", params: { style: "VHS Tear", amount: 55, bandSize: 25, split: 5, seed: 99 } }]],
+  ["glitch-blocks", "portrait", [{ type: "glitch", params: { style: "CCD Failure", amount: 60, bandSize: 30, split: 6, corrupt: 50, blocks: 70, seed: 42 } }]],
   ["liquid", "portrait", [{ type: "liquid", params: { intensity: 55, waveX: 35, waveY: 25, flow: "organic", noise: "fractal", octaves: 2, seed: 7 } }]],
   ["specular", "portrait", [{ type: "specular", params: { surfaceScale: 4, strength: 70, shininess: 30, azimuth: 300, elevation: 40, bumpBlur: 1, color: "#ffddaa", blend: "screen", opacity: 85 } }]],
   ["morphology", "checker", [{ type: "morphology", params: { op: "dilate", radiusX: 2, radiusY: 2 } }]],

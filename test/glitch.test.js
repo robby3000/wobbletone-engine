@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { makeBuffer } from "../buffer.js";
-import { glitch, buildGlitchBands, glitchSettings, GLITCH_PROFILES } from "../effects/glitch.js";
+import { glitch, buildGlitchBands, buildGlitchBlocks, glitchSettings, GLITCH_PROFILES } from "../effects/glitch.js";
 import { seededRandom } from "../rng.js";
 import { EFFECTS } from "../registry.js";
 
@@ -174,4 +174,55 @@ test("registry wires apply for glitch", () => {
   const before = [...b.data];
   EFFECTS.glitch.apply(b, PARAMS);
   assert.notDeepEqual([...b.data], before);
+});
+
+test("blocks=0 leaves output identical to pre-block path", () => {
+  const a = filled([90, 120, 180, 255], 24, 24);
+  glitch(a, PARAMS);
+  const b = filled([90, 120, 180, 255], 24, 24);
+  glitch(b, { ...PARAMS, blocks: 0 });
+  assert.deepEqual([...b.data], [...a.data]);
+});
+
+test("blocks produce rectangular displaced regions", () => {
+  const settings = glitchSettings({ ...PARAMS, blocks: 100 }, 1);
+  const blocks = buildGlitchBlocks(settings, 64, 64);
+  assert.ok(blocks.length > 0, "expected blocks at blocks=100");
+  for (const bl of blocks) {
+    assert.ok(bl.w >= 2 && bl.h >= 1);
+    assert.ok(bl.x >= 0 && bl.x + bl.w <= 64);
+    assert.ok(bl.y >= 0 && bl.y + bl.h <= 64);
+  }
+  const b = filled([90, 120, 180, 255], 64, 64);
+  const before = [...b.data];
+  glitch(b, { ...PARAMS, blocks: 100 });
+  assert.notDeepEqual([...b.data], before);
+});
+
+test("block displacement shifts source pixels", () => {
+  // Horizontal gradient: a displaced sample inside a block lands on a
+  // different value than the band-only pass would produce.
+  const grad = () => {
+    const b = makeBuffer(64, 64);
+    for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) {
+      const i = (y * 64 + x) * 4;
+      b.data[i] = Math.round((x / 63) * 255);
+      b.data[i + 1] = b.data[i + 2] = b.data[i];
+      b.data[i + 3] = 255;
+    }
+    return b;
+  };
+  const noBlocks = grad();
+  glitch(noBlocks, { ...PARAMS, blocks: 0, corrupt: 0, split: 0 });
+  const withBlocks = grad();
+  glitch(withBlocks, { ...PARAMS, blocks: 100, corrupt: 0, split: 0, amount: 100 });
+  assert.notDeepEqual([...withBlocks.data], [...noBlocks.data]);
+});
+
+test("blocks are deterministic per seed", () => {
+  const s1 = glitchSettings({ ...PARAMS, blocks: 80, seed: 42 }, 1);
+  const s2 = glitchSettings({ ...PARAMS, blocks: 80, seed: 42 }, 1);
+  const s3 = glitchSettings({ ...PARAMS, blocks: 80, seed: 43 }, 1);
+  assert.deepEqual(buildGlitchBlocks(s1, 64, 64), buildGlitchBlocks(s2, 64, 64));
+  assert.notDeepEqual(buildGlitchBlocks(s1, 64, 64), buildGlitchBlocks(s3, 64, 64));
 });

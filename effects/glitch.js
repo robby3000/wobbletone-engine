@@ -36,9 +36,10 @@ export function glitchSettings(params, renderScale = 1) {
   const bandSize = clamp(Number(params.bandSize) || 0, 1, 100) / 100;
   const split = Math.max(0, Number(params.split) || 0) * profile.split * amount;
   const corrupt = clamp(Number(params.corrupt) || 0, 0, 100) / 100;
+  const blocks = clamp(Number(params.blocks) || 0, 0, 100) / 100;
   const displacement = amount * 100 * profile.displacement * renderScale;
   const frequencyY = 0.015 + (1 - bandSize) * 0.1;
-  return { style, profile, amount, bandSize, split, corrupt, displacement, frequencyY, seed: Math.round(clamp(Number(params.seed) || 1, 1, 9999)) };
+  return { style, profile, amount, bandSize, split, corrupt, blocks, displacement, frequencyY, seed: Math.round(clamp(Number(params.seed) || 1, 1, 9999)) };
 }
 
 export function buildGlitchBands(params, width, height, renderScale = 1) {
@@ -84,6 +85,47 @@ export function buildGlitchBands(params, width, height, renderScale = 1) {
   return { bands, split: baseSplit, rowSeed: styleSeed ^ 0x51f3 };
 }
 
+// Rectangular corruption blocks — the datamosh look. Seeded rects get an
+// independent dx/dy tear plus, at corrupt>0, a shared corruption mode.
+// Rendered as a post-pass sampling the pristine source, so blocks slice
+// across band boundaries cleanly.
+export function buildGlitchBlocks(settings, width, height) {
+  if (settings.blocks <= 0 || settings.amount <= 0) return [];
+  const styleSeed = [...settings.style].reduce((value, char) => Math.imul(value ^ char.charCodeAt(0), 16777619), settings.seed);
+  const random = seededRandom(styleSeed ^ 0x9e3779b9);
+  const n = Math.round(settings.blocks * (0.3 + settings.amount) * 20);
+  const blocks = [];
+  for (let i = 0; i < n; i++) {
+    const bw = Math.max(2, Math.round(width * (0.03 + random() * 0.25)));
+    const bh = Math.max(1, Math.round(height * (0.015 + random() * 0.1)));
+    const bx = Math.floor(random() * Math.max(1, width - bw));
+    const by = Math.floor(random() * Math.max(1, height - bh));
+    const dx = Math.round((random() * 2 - 1) * settings.displacement * 1.6);
+    const dy = Math.round((random() * 2 - 1) * settings.displacement * 0.35);
+    const bSplit = settings.split > 0
+      ? Math.max(1, Math.round(settings.split * (0.5 + random()))) * (random() < 0.2 ? -1 : 1)
+      : 0;
+    let corrupt = null;
+    if (settings.corrupt > 0 && random() < settings.corrupt) {
+      const mix = settings.profile.corruptMix;
+      let pick = random();
+      let mode = CORRUPT_MODES.length - 1;
+      for (let m = 0; m < mix.length; m++) {
+        if (pick < mix[m]) { mode = m; break; }
+        pick -= mix[m];
+      }
+      const severity = 0.4 + random() * 0.6;
+      const arg = mode === 0 ? (random() * 2 - 1) * 180
+        : mode === 2 ? Math.floor(random() * 3)
+        : mode === 3 ? 2 + Math.floor(random() * 3)
+        : 0;
+      corrupt = { mode: CORRUPT_MODES[mode], severity, arg };
+    }
+    blocks.push({ x: bx, y: by, w: bw, h: bh, dx, dy, split: bSplit, corrupt });
+  }
+  return blocks;
+}
+
 // Per-band colour destruction, applied after the split-sampled rgb.
 function applyCorrupt(band, rgb) {
   const { mode, severity, arg } = band.corrupt;
@@ -113,6 +155,7 @@ export function glitch(buffer, params, ctx = {}) {
   const copy = acquireBuffer(width, height, { zero: false });
   const source = copy.data;
   source.set(data);
+  const settings = glitchSettings(params, renderScale);
   const { bands, split, rowSeed } = buildGlitchBands(params, width, height, renderScale);
   const rgb = [0, 0, 0];
   for (const band of bands) {
@@ -140,6 +183,30 @@ export function glitch(buffer, params, ctx = {}) {
         data[index + 1] = clamp(Math.round(rgb[1] * band.exposure), 0, 255);
         data[index + 2] = clamp(Math.round(rgb[2] * band.exposure), 0, 255);
         data[index + 3] = source[index + 3];
+      }
+    }
+  }
+
+  // Block-corruption post-pass: displaced rectangular ghosts of the
+  // original source, punched through the band pass.
+  for (const block of buildGlitchBlocks(settings, width, height)) {
+    for (let y = block.y; y < block.y + block.h; y++) {
+      const sourceY = clamp(y - block.dy, 0, height - 1);
+      const row = sourceY * width;
+      const out = y * width;
+      for (let x = block.x; x < block.x + block.w; x++) {
+        const index = (out + x) * 4;
+        const sourceX = clamp(x - block.dx, 0, width - 1);
+        const redIndex = (row + clamp(sourceX - block.split, 0, width - 1)) * 4;
+        const centreIndex = (row + sourceX) * 4;
+        const blueIndex = (row + clamp(sourceX + block.split, 0, width - 1)) * 4;
+        rgb[0] = source[redIndex];
+        rgb[1] = source[centreIndex + 1];
+        rgb[2] = source[blueIndex + 2];
+        if (block.corrupt) applyCorrupt(block, rgb);
+        data[index] = rgb[0];
+        data[index + 1] = rgb[1];
+        data[index + 2] = rgb[2];
       }
     }
   }
