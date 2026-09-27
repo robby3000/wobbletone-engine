@@ -1,13 +1,11 @@
-// Morphology — rectangular dilate (max) / erode (min) filter.
+// Morphology — rectangular dilate (max) / erode (min) filter over RGBA.
 //
 // op=dilate grows bright regions (blooming highlights, thickened bright
 // features); op=erode grows dark regions (etched, lith-printed feel).
-// input=graphic runs the window over all RGBA channels; input=alpha
-// reshapes transparency only. Separable passes: horizontal then
-// vertical, each a sliding-window extremum via monotonic deque — O(W)
-// per row/column regardless of radius, so large radii stay cheap.
-// radiusX/radiusY are px-flagged; edge handling clamps indices (edge
-// values extend), matching blur's convention.
+// Separable passes: horizontal then vertical, each a sliding-window
+// extremum via monotonic deque — O(W) per row/column regardless of
+// radius, so large radii stay cheap. radiusX/radiusY are px-flagged;
+// edge handling clamps indices (edge values extend), matching blur.
 
 import { acquireBuffer, releaseBuffer } from "../pool.js";
 
@@ -43,9 +41,8 @@ export function morphology(buffer, params) {
   const rx = Math.round(params.radiusX);
   const ry = Math.round(params.radiusY);
   if (rx <= 0 && ry <= 0) return buffer;
-  const alphaOnly = params.input === "alpha";
   const dir = params.op === "erode" ? -1 : 1;
-  const channels = alphaOnly ? [3] : [0, 1, 2, 3];
+  const channels = [0, 1, 2, 3];
   const d = buffer.data;
 
   const tmp = acquireBuffer(W, H, { zero: false });

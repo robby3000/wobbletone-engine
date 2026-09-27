@@ -4,7 +4,7 @@ import { makeBuffer } from "../buffer.js";
 import { morphology } from "../effects/morphology.js";
 import { EFFECTS } from "../registry.js";
 
-const PARAMS = { op: "dilate", radiusX: 1, radiusY: 1, input: "graphic" };
+const PARAMS = { op: "dilate", radiusX: 1, radiusY: 1 };
 
 // Single bright pixel on black.
 const dot = (w, h, px, py, v = 255) => {
@@ -46,29 +46,6 @@ test("independent X/Y radii produce rectangles", () => {
   morphology(b, { ...PARAMS, radiusX: 3, radiusY: 0 });
   // 7-wide horizontal streak, single row.
   assert.equal(brightCount(b), 7);
-});
-
-test("alpha-only input leaves RGB untouched", () => {
-  const b = dot(9, 9, 4, 4);
-  const rgbBefore = [];
-  for (let i = 0; i < b.data.length; i += 4) rgbBefore.push(b.data[i], b.data[i + 1], b.data[i + 2]);
-  morphology(b, { ...PARAMS, input: "alpha", op: "erode", radiusX: 1, radiusY: 1 });
-  const rgbAfter = [];
-  for (let i = 0; i < b.data.length; i += 4) rgbAfter.push(b.data[i], b.data[i + 1], b.data[i + 2]);
-  assert.deepEqual(rgbAfter, rgbBefore);
-});
-
-test("alpha erode shrinks an opaque region", () => {
-  const b = makeBuffer(11, 11);
-  for (let y = 0; y < 11; y++) for (let x = 0; x < 11; x++) {
-    const i = (y * 11 + x) * 4;
-    b.data[i + 3] = (x >= 3 && x <= 7 && y >= 3 && y <= 7) ? 255 : 0;
-  }
-  morphology(b, { ...PARAMS, input: "alpha", op: "erode", radiusX: 1, radiusY: 1 });
-  // Opaque 5×5 shrinks to 3×3 (corners eroded).
-  let opaque = 0;
-  for (let p = 0; p < 11 * 11; p++) if (b.data[p * 4 + 3] === 255) opaque++;
-  assert.equal(opaque, 9);
 });
 
 test("edge clamping extends edge values (dilate a border pixel)", () => {

@@ -277,7 +277,6 @@ export const EFFECTS = {
       op: sel(["dilate", "erode"], "dilate"),
       radiusX: num(0, 40, 4, { unit: "px", px: true }),
       radiusY: num(0, 40, 4, { unit: "px", px: true }),
-      input: sel(["graphic", "alpha"], "graphic"),
     },
   },
 
