@@ -12,7 +12,7 @@ import { acquireBuffer, releaseBuffer } from "../pool.js";
 // Sliding-window extremum along one row of `n` samples spaced `stride`,
 // writing dst at the same offsets. rx = window half-size, dir = +1 max,
 // -1 min. Monotone deque of indices keeps the front at the extremum.
-function slideExtremum(src, dst, base, n, stride, rx, dir) {
+export function slideExtremum(src, dst, base, n, stride, rx, dir) {
   if (rx <= 0) {
     for (let x = 0; x < n; x++) dst[base + x * stride] = src[base + x * stride];
     return;

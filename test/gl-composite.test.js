@@ -23,15 +23,16 @@ test("dropshadow + drama + liquid remain CPU-only gates", () => {
   assert.equal(canRenderGPU(spec([{ type: "liquid", params: {} }])), false);
   assert.equal(canRenderGPU(spec([{ type: "specular", params: {} }])), false);
   assert.equal(canRenderGPU(spec([{ type: "morphology", params: {} }])), false);
+  assert.equal(canRenderGPU(spec([{ type: "outline", params: {} }])), false);
 });
 
-test("full-coverage check: drama/dropshadow/liquid/specular/morphology remain CPU-gated", async () => {
+test("full-coverage check: drama/dropshadow/liquid/specular/morphology/outline remain CPU-gated", async () => {
   // Enumerate every registry effect and see which still lack a GPU path.
   const { EFFECTS } = await import("../registry.js");
   const unsupported = Object.keys(EFFECTS).filter((t) =>
     !canRenderGPU({ format: "wobbletone-filter", version: 1, name: "t",
       effects: [{ type: t, params: defaultParams(EFFECTS[t]) }] }));
-  assert.deepEqual(unsupported.sort(), ["drama", "dropshadow", "liquid", "specular", "morphology"].sort());
+  assert.deepEqual(unsupported.sort(), ["drama", "dropshadow", "liquid", "specular", "morphology", "outline"].sort());
 });
 
 function defaultParams(def) {

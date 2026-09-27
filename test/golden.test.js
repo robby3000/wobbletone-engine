@@ -38,6 +38,7 @@ const EXPECTED = {
   "liquid": "c40a3e60",
   "specular": "c269f9e9",
   "morphology": "f9ec87b5",
+  "outline": "7d3b14ef",
   "infrared": "be274bdf",
   "vintage": "7e9c8e37",
   "psychedelic": "ec999b06",

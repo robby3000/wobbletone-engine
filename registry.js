@@ -20,6 +20,7 @@ import * as grainFx from "./effects/grain.js";
 import * as liquidFx from "./effects/liquid.js";
 import * as specularFx from "./effects/specular.js";
 import * as morphologyFx from "./effects/morphology.js";
+import * as outlineFx from "./effects/outline.js";
 import * as glitchFx from "./effects/glitch.js";
 import * as bloomFx from "./effects/bloom.js";
 import * as dropshadowFx from "./effects/dropshadow.js";
@@ -277,6 +278,19 @@ export const EFFECTS = {
       op: sel(["dilate", "erode"], "dilate"),
       radiusX: num(0, 40, 4, { unit: "px", px: true }),
       radiusY: num(0, 40, 4, { unit: "px", px: true }),
+    },
+  },
+  outline: {
+    category: "procedural",
+    apply: outlineFx.outline,
+    params: {
+      threshold: num(0, 100, 15),
+      width: num(0, 8, 1, { unit: "px", px: true }),
+      color: col("#101010"),
+      detail: num(0, 10, 0, { unit: "px", px: true }),
+      softness: num(0, 10, 0, { unit: "px", px: true }),
+      surface: sel(["original", "light", "dark"], "original"),
+      opacity: num(0, 100, 100, { unit: "%" }),
     },
   },
 
