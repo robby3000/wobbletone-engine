@@ -19,6 +19,7 @@ import * as overlayFx from "./effects/overlay.js";
 import * as grainFx from "./effects/grain.js";
 import * as liquidFx from "./effects/liquid.js";
 import * as specularFx from "./effects/specular.js";
+import * as morphologyFx from "./effects/morphology.js";
 import * as glitchFx from "./effects/glitch.js";
 import * as bloomFx from "./effects/bloom.js";
 import * as dropshadowFx from "./effects/dropshadow.js";
@@ -267,6 +268,16 @@ export const EFFECTS = {
       source: sel(["luminance", "alpha"], "luminance"),
       blend: sel(["screen", "lighten", "overlay", "soft-light"], "screen"),
       opacity: num(0, 100, 100, { unit: "%" }),
+    },
+  },
+  morphology: {
+    category: "procedural",
+    apply: morphologyFx.morphology,
+    params: {
+      op: sel(["dilate", "erode"], "dilate"),
+      radiusX: num(0, 40, 4, { unit: "px", px: true }),
+      radiusY: num(0, 40, 4, { unit: "px", px: true }),
+      input: sel(["graphic", "alpha"], "graphic"),
     },
   },
 
