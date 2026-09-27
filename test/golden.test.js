@@ -36,6 +36,7 @@ const EXPECTED = {
   "grain": "e55462a6",
   "glitch": "4b98660f",
   "liquid": "c40a3e60",
+  "specular": "c269f9e9",
   "infrared": "be274bdf",
   "vintage": "7e9c8e37",
   "psychedelic": "ec999b06",

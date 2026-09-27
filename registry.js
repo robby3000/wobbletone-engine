@@ -18,6 +18,7 @@ import * as blurFx from "./effects/blur.js";
 import * as overlayFx from "./effects/overlay.js";
 import * as grainFx from "./effects/grain.js";
 import * as liquidFx from "./effects/liquid.js";
+import * as specularFx from "./effects/specular.js";
 import * as glitchFx from "./effects/glitch.js";
 import * as bloomFx from "./effects/bloom.js";
 import * as dropshadowFx from "./effects/dropshadow.js";
@@ -250,6 +251,22 @@ export const EFFECTS = {
       softness: num(0, 20, 0, { unit: "px", px: true }),
       highlight: num(0, 100, 0, { unit: "%" }),
       mix: num(0, 100, 0, { unit: "%" }),
+    },
+  },
+  specular: {
+    category: "procedural",
+    apply: specularFx.specular,
+    params: {
+      surfaceScale: num(0, 10, 2),
+      strength: num(0, 100, 40, { unit: "%" }),
+      shininess: num(1, 100, 25),
+      color: col("#ffffff"),
+      azimuth: num(0, 360, 315, { unit: "°" }),
+      elevation: num(0, 90, 45, { unit: "°" }),
+      bumpBlur: num(0, 10, 0, { unit: "px", px: true }),
+      source: sel(["luminance", "alpha"], "luminance"),
+      blend: sel(["screen", "lighten", "overlay", "soft-light"], "screen"),
+      opacity: num(0, 100, 100, { unit: "%" }),
     },
   },
 

@@ -109,6 +109,7 @@ export const CASES = [
   ["grain", "portrait", [{ type: "grain", params: { size: 1.2, opacity: 35, blend: "overlay", seed: 11 } }]],
   ["glitch", "checker", [{ type: "glitch", params: { style: "VHS Tear", amount: 55, bandSize: 25, split: 5, seed: 99 } }]],
   ["liquid", "portrait", [{ type: "liquid", params: { intensity: 55, waveX: 35, waveY: 25, flow: "organic", noise: "fractal", octaves: 2, seed: 7 } }]],
+  ["specular", "portrait", [{ type: "specular", params: { surfaceScale: 4, strength: 70, shininess: 30, azimuth: 300, elevation: 40, bumpBlur: 1, color: "#ffddaa", blend: "screen", opacity: 85 } }]],
   ["infrared", "portrait", [{ type: "infrared", params: { intensity: 75 } }]],
   ["vintage", "portrait", [{ type: "vintage", params: { sepia: 50, contrast: 90, saturate: 85, brightness: 108 } }]],
   ["psychedelic", "gradient", [{ type: "psychedelic", params: { saturate: 300, contrast: 140, bands: 8, solarize: 60 } }]],
