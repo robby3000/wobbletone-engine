@@ -9,7 +9,7 @@ const EXPECTED_TYPES = [
   "duotone", "tritone", "posterize", "solarize", "hueband", "heatmap", "shadowshighlights", "drama",
   "bloom", "chromatic", "dropshadow",
   "colorwash", "gradient", "overlay", "vignette", "scanlines", "prism",
-  "grain", "glitch",
+  "grain", "glitch", "liquid",
   "psychedelic", "infrared", "vintage",
 ];
 
@@ -21,6 +21,7 @@ const EXPECTED_PX = [
   "grain.size",
   "scanlines.size",
   "glitch.split",
+  "liquid.softness",
 ];
 
 const CATEGORIES = new Set(["pointwise", "neighbourhood", "tone", "composite", "overlay", "procedural", "compound"]);

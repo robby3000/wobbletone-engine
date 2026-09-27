@@ -17,18 +17,19 @@ test("bloom and chromatic are GPU-renderable", () => {
   ])), true);
 });
 
-test("dropshadow + drama remain CPU-only gates", () => {
+test("dropshadow + drama + liquid remain CPU-only gates", () => {
   assert.equal(canRenderGPU(spec([{ type: "dropshadow", params: { x: 4, y: 4, blur: 8, color: "#000" } }])), false);
   assert.equal(canRenderGPU(spec([{ type: "drama", params: {} }])), false);
+  assert.equal(canRenderGPU(spec([{ type: "liquid", params: {} }])), false);
 });
 
-test("full-coverage check: only drama/dropshadow remain CPU-gated", async () => {
+test("full-coverage check: only drama/dropshadow/liquid remain CPU-gated", async () => {
   // Enumerate every registry effect and see which still lack a GPU path.
   const { EFFECTS } = await import("../registry.js");
   const unsupported = Object.keys(EFFECTS).filter((t) =>
     !canRenderGPU({ format: "wobbletone-filter", version: 1, name: "t",
       effects: [{ type: t, params: defaultParams(EFFECTS[t]) }] }));
-  assert.deepEqual(unsupported.sort(), ["drama", "dropshadow"].sort());
+  assert.deepEqual(unsupported.sort(), ["drama", "dropshadow", "liquid"].sort());
 });
 
 function defaultParams(def) {

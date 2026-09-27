@@ -17,6 +17,7 @@ import * as tone from "./effects/tone.js";
 import * as blurFx from "./effects/blur.js";
 import * as overlayFx from "./effects/overlay.js";
 import * as grainFx from "./effects/grain.js";
+import * as liquidFx from "./effects/liquid.js";
 import * as glitchFx from "./effects/glitch.js";
 import * as bloomFx from "./effects/bloom.js";
 import * as dropshadowFx from "./effects/dropshadow.js";
@@ -233,6 +234,22 @@ export const EFFECTS = {
       split: num(0, 30, 6, { unit: "px", px: true }),
       corrupt: num(0, 100, 40, { unit: "%" }),
       seed: num(1, 9999, 317),
+    },
+  },
+  liquid: {
+    category: "procedural",
+    apply: liquidFx.liquid,
+    params: {
+      intensity: num(0, 100, 30, { unit: "%" }),
+      waveX: num(0, 100, 20),
+      waveY: num(0, 100, 20),
+      flow: sel(["horizontal", "vertical", "diagonal", "radial", "organic"], "organic"),
+      noise: sel(["fractal", "turbulence"], "fractal"),
+      octaves: num(1, 4, 2),
+      seed: num(1, 9999, 1),
+      softness: num(0, 20, 0, { unit: "px", px: true }),
+      highlight: num(0, 100, 0, { unit: "%" }),
+      mix: num(0, 100, 0, { unit: "%" }),
     },
   },
 

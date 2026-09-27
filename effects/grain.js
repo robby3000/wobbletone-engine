@@ -27,8 +27,14 @@ export function grainCell(seed, i, j) {
 
 // Bilinear value-noise sample at render pixel (x, y) — pass pixel centres.
 export function grainValue(seed, x, y, cellPx) {
-  const gx = x / cellPx;
-  const gy = y / cellPx;
+  return grainValueXY(seed, x, y, cellPx, cellPx);
+}
+
+// Same lattice noise with independent X/Y cell sizes — liquid uses it for
+// anisotropic wave fields.
+export function grainValueXY(seed, x, y, cellX, cellY) {
+  const gx = x / cellX;
+  const gy = y / cellY;
   const i = Math.floor(gx);
   const j = Math.floor(gy);
   const fx = gx - i;
