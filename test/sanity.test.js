@@ -6,7 +6,7 @@ import { seededRandom } from "../rng.js";
 import { clamp, lerpByte, hexToRgb, rgb01, luminance } from "../color.js";
 
 test("ENGINE_VERSION is exported", () => {
-  assert.equal(ENGINE_VERSION, "1.12.1");
+  assert.equal(ENGINE_VERSION, "1.12.2");
 });
 
 test("makeBuffer allocates a zeroed RGBA buffer", () => {

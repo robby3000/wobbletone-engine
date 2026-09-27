@@ -93,11 +93,20 @@ export function buildGlitchBlocks(settings, width, height) {
   if (settings.blocks <= 0 || settings.amount <= 0) return [];
   const styleSeed = [...settings.style].reduce((value, char) => Math.imul(value ^ char.charCodeAt(0), 16777619), settings.seed);
   const random = seededRandom(styleSeed ^ 0x9e3779b9);
-  const n = Math.round(settings.blocks * (0.3 + settings.amount) * 20);
+  const n = Math.round(settings.blocks * (0.3 + settings.amount) * 26);
   const blocks = [];
   for (let i = 0; i < n; i++) {
-    const bw = Math.max(2, Math.round(width * (0.03 + random() * 0.25)));
-    const bh = Math.max(1, Math.round(height * (0.015 + random() * 0.1)));
+    // Two classes: small shards always, plus occasional large "slabs" whose
+    // likelihood and ceiling both grow with the blocks slider — so low
+    // values pepper the frame and high values tear it with big overlapping
+    // rects.
+    const slab = random() < settings.blocks * 0.3;
+    const bw = Math.max(2, Math.round(width * (slab
+      ? 0.2 + random() * (0.15 + settings.blocks * 0.4)
+      : 0.03 + random() * 0.22)));
+    const bh = Math.max(1, Math.round(height * (slab
+      ? 0.05 + random() * (0.08 + settings.blocks * 0.2)
+      : 0.015 + random() * 0.09)));
     const bx = Math.floor(random() * Math.max(1, width - bw));
     const by = Math.floor(random() * Math.max(1, height - bh));
     const dx = Math.round((random() * 2 - 1) * settings.displacement * 1.6);

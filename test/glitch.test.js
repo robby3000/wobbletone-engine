@@ -219,6 +219,12 @@ test("block displacement shifts source pixels", () => {
   assert.notDeepEqual([...withBlocks.data], [...noBlocks.data]);
 });
 
+test("higher blocks slider produces larger blocks", () => {
+  const area = (v) => buildGlitchBlocks(glitchSettings({ ...PARAMS, blocks: v, seed: 42 }, 1), 128, 128)
+    .reduce((m, b) => Math.max(m, b.w * b.h), 0);
+  assert.ok(area(100) > area(20), "expected larger blocks at higher slider values");
+});
+
 test("blocks are deterministic per seed", () => {
   const s1 = glitchSettings({ ...PARAMS, blocks: 80, seed: 42 }, 1);
   const s2 = glitchSettings({ ...PARAMS, blocks: 80, seed: 42 }, 1);
