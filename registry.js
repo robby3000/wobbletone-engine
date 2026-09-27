@@ -21,6 +21,7 @@ import * as liquidFx from "./effects/liquid.js";
 import * as specularFx from "./effects/specular.js";
 import * as morphologyFx from "./effects/morphology.js";
 import * as outlineFx from "./effects/outline.js";
+import * as echoFx from "./effects/echo.js";
 import * as glitchFx from "./effects/glitch.js";
 import * as bloomFx from "./effects/bloom.js";
 import * as dropshadowFx from "./effects/dropshadow.js";
@@ -291,6 +292,19 @@ export const EFFECTS = {
       softness: num(0, 10, 0, { unit: "px", px: true }),
       surface: sel(["original", "light", "dark"], "original"),
       opacity: num(0, 100, 100, { unit: "%" }),
+    },
+  },
+  echo: {
+    category: "procedural",
+    apply: echoFx.echo,
+    params: {
+      count: num(1, 6, 2),
+      distance: num(0, 100, 30, { unit: "px", px: true }),
+      direction: num(0, 360, 0, { unit: "°" }),
+      decay: num(0, 100, 55, { unit: "%" }),
+      blur: num(0, 20, 0, { unit: "px", px: true }),
+      blend: sel(["normal", "screen", "lighten"], "normal"),
+      opacity: num(0, 100, 60, { unit: "%" }),
     },
   },
 

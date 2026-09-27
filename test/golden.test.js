@@ -39,6 +39,7 @@ const EXPECTED = {
   "specular": "c269f9e9",
   "morphology": "f9ec87b5",
   "outline": "7d3b14ef",
+  "echo": "966cb3e5",
   "infrared": "be274bdf",
   "vintage": "7e9c8e37",
   "psychedelic": "ec999b06",

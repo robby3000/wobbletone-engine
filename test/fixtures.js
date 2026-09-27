@@ -112,6 +112,7 @@ export const CASES = [
   ["specular", "portrait", [{ type: "specular", params: { surfaceScale: 4, strength: 70, shininess: 30, azimuth: 300, elevation: 40, bumpBlur: 1, color: "#ffddaa", blend: "screen", opacity: 85 } }]],
   ["morphology", "checker", [{ type: "morphology", params: { op: "dilate", radiusX: 2, radiusY: 2 } }]],
   ["outline", "portrait", [{ type: "outline", params: { threshold: 12, width: 1, color: "#181828", detail: 1, softness: 0.5, surface: "original", opacity: 90 } }]],
+  ["echo", "portrait", [{ type: "echo", params: { count: 3, distance: 20, direction: 160, decay: 55, blur: 1.5, blend: "normal", opacity: 55 } }]],
   ["infrared", "portrait", [{ type: "infrared", params: { intensity: 75 } }]],
   ["vintage", "portrait", [{ type: "vintage", params: { sepia: 50, contrast: 90, saturate: 85, brightness: 108 } }]],
   ["psychedelic", "gradient", [{ type: "psychedelic", params: { saturate: 300, contrast: 140, bands: 8, solarize: 60 } }]],
