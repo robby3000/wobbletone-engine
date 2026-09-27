@@ -29,7 +29,9 @@ export function canRenderGPU(spec) {
       if (run.every((e) => canRunGPU(e.type))) continue;
       if (run.length === 1 && run[0].type === "blur") continue;
       if (run.length === 1 && GPU_OVERLAY_TYPES.has(run[0].type)) continue;
-      if (run.length === 1 && (run[0].type === "grain" || run[0].type === "glitch")) continue;
+      if (run.length === 1 && run[0].type === "grain") continue;
+      // glitch blocks are CPU-only — the GLSL path implements bands only.
+      if (run.length === 1 && run[0].type === "glitch" && !(Number(run[0].params.blocks) > 0)) continue;
       if (run.length === 1 && (run[0].type === "bloom" || run[0].type === "chromatic")) continue;
       return false;
     }

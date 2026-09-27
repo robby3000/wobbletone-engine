@@ -35,8 +35,8 @@ can cover the whole stack.
 
 Dispatch rule: the GPU takes a render only if **every** effect in the spec has
 a GPU path. Stacks containing a CPU-only effect (`drama`, `dropshadow`,
-`liquid`, `specular`, `morphology`, `outline`, `echo`, `glitch`) render
-entirely on CPU: a stack is never split mid-render. The session also demotes
+`liquid`, `specular`, `morphology`, `outline`, `echo`, or `glitch` with
+`blocks` > 0) render entirely on CPU: a stack is never split mid-render. The session also demotes
 GPU if shadow probes show it is slower, and recovers cleanly from context loss
 (`webglcontextlost`/`restored` rebuild the session).
 

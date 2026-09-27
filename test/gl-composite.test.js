@@ -27,6 +27,14 @@ test("dropshadow + drama + liquid remain CPU-only gates", () => {
   assert.equal(canRenderGPU(spec([{ type: "echo", params: {} }])), false);
 });
 
+test("glitch gates to CPU only when blocks are active", () => {
+  const glitch = (blocks) => ({ type: "glitch", params: { style: "CCD Failure", amount: 42, bandSize: 28, split: 6, corrupt: 40, blocks, seed: 317 } });
+  assert.equal(canRenderGPU(spec([glitch(0)])), true);
+  assert.equal(canRenderGPU(spec([glitch(80)])), false);
+  // blocks>0 demotes the whole stack, not just the glitch run.
+  assert.equal(canRenderGPU(spec([{ type: "brightness", params: { v: 110 } }, glitch(80)])), false);
+});
+
 test("full-coverage check: drama/dropshadow/liquid/specular/morphology/outline/echo remain CPU-gated", async () => {
   // Enumerate every registry effect and see which still lack a GPU path.
   const { EFFECTS } = await import("../registry.js");
