@@ -162,36 +162,48 @@ export function shadowshighlights(buffer, params) {
 //   clarity    unsharp-mask amount: + = microcontrast, − = softening
 //   glow       screen-blend of the blurred copy (halation)
 //   shadow / highlight  per-channel grade ramps across the tone range
+//
+// DRAMA_EXAGGERATE overshoots the authored look: at strength 100 the tone,
+// grade, saturation, clarity and glow all land ~1.45x past the recipe, so
+// the slider top is deliberately extreme and normal use lives lower. The
+// default (70) lands almost exactly at the pre-exaggeration maximum.
+const DRAMA_EXAGGERATE = 1.45;
+
 const DRAMA_LOOKS = {
   cinematic: {
-    curve: [0, 0.14, 0.5, 0.87, 0.985], saturation: 0.8, clarity: 0.2, glow: 0,
-    shadow: [-0.02, 0.005, 0.05], highlight: [0.05, 0.022, -0.02],
+    curve: [0, 0.1, 0.5, 0.9, 1], saturation: 0.75, clarity: 0.45, glow: 0,
+    shadow: [-0.03, 0.005, 0.06], highlight: [0.06, 0.03, -0.03],
   },
   noir: {
-    curve: [0.005, 0.08, 0.45, 0.93, 1], saturation: 0, clarity: 0.6, glow: 0,
-    shadow: [0, 0.002, 0.01], highlight: [0.005, 0.005, 0.005],
+    // True monochrome: the grade ramps are channel-neutral — any uneven tint
+    // survives the zeroed saturation multiplier and reads as colour in what
+    // should be a grayscale look.
+    curve: [0, 0.05, 0.42, 0.95, 1], saturation: 0, clarity: 1, glow: 0,
+    shadow: [0.012, 0.012, 0.012], highlight: [0.015, 0.015, 0.015],
   },
   bleach: {
-    curve: [0.015, 0.14, 0.44, 0.9, 1], saturation: 0.4, clarity: 0.5, glow: 0,
-    shadow: [-0.012, 0, 0.018], highlight: [0.028, 0.022, 0],
+    curve: [0.03, 0.18, 0.5, 0.92, 1], saturation: 0.3, clarity: 0.7, glow: 0.08,
+    shadow: [-0.015, 0, 0.025], highlight: [0.04, 0.03, 0],
   },
   storm: {
-    curve: [0, 0.11, 0.42, 0.7, 0.88], saturation: 0.55, clarity: 0.4, glow: 0,
-    shadow: [-0.02, 0.005, 0.06], highlight: [-0.008, 0.008, 0.035],
+    curve: [0, 0.07, 0.4, 0.66, 0.85], saturation: 0.5, clarity: 0.7, glow: 0,
+    shadow: [-0.03, 0.005, 0.07], highlight: [-0.01, 0.01, 0.045],
   },
   portrait: {
-    curve: [0.05, 0.24, 0.52, 0.78, 0.96], saturation: 0.92, clarity: -0.35, glow: 0.22,
-    shadow: [0.02, 0.006, -0.012], highlight: [0.05, 0.02, -0.022],
+    curve: [0.06, 0.27, 0.52, 0.8, 0.97], saturation: 0.9, clarity: -0.5, glow: 0.3,
+    shadow: [0.03, 0.008, -0.015], highlight: [0.06, 0.025, -0.03],
   },
 };
 
 export function dramaSettings(params) {
   const look = DRAMA_LOOKS[String(params.style || "cinematic").toLowerCase()] || DRAMA_LOOKS.cinematic;
-  const strength = clamp(Number(params.strength) || 0, 0, 100) / 100;
+  const strength = clamp(Number(params.strength) || 0, 0, 100) / 100 * DRAMA_EXAGGERATE;
   const shadows = clamp(Number(params.shadows) || 0, -50, 50) / 50 * 0.12 * strength;
   const highlights = clamp(Number(params.highlights) || 0, -50, 50) / 50 * 0.12 * strength;
   const requestedSaturation = clamp(Number(params.saturation) || 0, 0, 150) / 100;
-  const saturation = 1 + (look.saturation * requestedSaturation - 1) * strength;
+  // max(0): with exaggeration the noir look extrapolates below zero, which
+  // would invert chroma instead of removing it.
+  const saturation = Math.max(0, 1 + (look.saturation * requestedSaturation - 1) * strength);
   const tableSize = 17;
   const tables = [0, 1, 2].map((channel) => {
     let previous = 0;

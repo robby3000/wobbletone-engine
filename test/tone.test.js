@@ -142,8 +142,11 @@ test("drama looks produce distinct controlled tone mappings", () => {
   drama(noir, { style: "Noir", strength: 100, shadows: 0, highlights: 0, saturation: 100 });
   assert.equal(cinematic.data[3], 111);
   assert.equal(noir.data[3], 111);
-  assert.deepEqual([...cinematic.data.slice(0, 3)], [60, 132, 217]);
-  assert.deepEqual([...noir.data.slice(0, 3)], [108, 108, 109]);
+  assert.deepEqual([...cinematic.data.slice(0, 3)], [56, 134, 216]);
+  // Noir must be true monochrome: equal channels, no residual grade tint.
+  assert.equal(noir.data[0], noir.data[1]);
+  assert.equal(noir.data[1], noir.data[2]);
+  assert.deepEqual([...noir.data.slice(0, 3)], [95, 95, 95]);
 });
 
 test("dramaSettings scales clarity and glow with strength", () => {

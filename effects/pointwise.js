@@ -53,10 +53,13 @@ export function saturate(buffer, params) {
 // passes, the complement darkens); strong filters sum to < 1 because they
 // physically transmit less light — that's where the real darkening comes
 // from (a red 25A costs ~3 stops). `intensity` lerps standard luminance →
-// filter weights. Then on the scalar gray: EV gain with an exponential
-// shoulder (soft rolloff instead of hard clip), contrast around mid-gray,
-// and region-weighted shadow/highlight deltas. Always full monochrome —
-// params.v (the old Amount) is ignored; partial desat lives in `saturate`.
+// filter weights, overshooting the physical filter past ~62% (GRAY_FILTER_
+// OVERSHOOT = 1.6): at 100% the channel separation is exaggerated beyond the
+// glass, so the slider top is extreme and everyday use lives lower. Then on
+// the scalar gray: EV gain with an exponential shoulder (soft rolloff
+// instead of hard clip), contrast around mid-gray, and region-weighted
+// shadow/highlight deltas. Always full monochrome — params.v (the old
+// Amount) is ignored; partial desat lives in `saturate`.
 const BW_FILTERS = {
   none: [0.2126, 0.7152, 0.0722],
   yellow: [0.34, 0.5, 0.08],
@@ -67,17 +70,20 @@ const BW_FILTERS = {
 };
 
 const GRAY_KNEE = 0.75, GRAY_SOFT = 3;
+const GRAY_FILTER_OVERSHOOT = 1.6;  // intensity 100 extrapolates past the glass filter
+const GRAY_CONTRAST_SWING = 2.4;    // contrast ±100 -> k in [0.1, 3.4]
+const GRAY_EXPOSURE_STOPS = 4;      // exposure ±100 -> ±4 EV
 
 export function grayscalePrepare(params = {}) {
   const w0 = BW_FILTERS.none;
   const wf = BW_FILTERS[String(params.filter || "None").toLowerCase()] || w0;
-  const t = clamp(Number(params.intensity) || 0, 0, 100) / 100;
+  const t = clamp(Number(params.intensity) || 0, 0, 100) / 100 * GRAY_FILTER_OVERSHOOT;
   return {
     wr: w0[0] + (wf[0] - w0[0]) * t,
     wg: w0[1] + (wf[1] - w0[1]) * t,
     wb: w0[2] + (wf[2] - w0[2]) * t,
-    gain: Math.pow(2, clamp(Number(params.exposure) || 0, -100, 100) / 33.33),
-    contrastK: Math.max(0.1, 1 + (clamp(Number(params.contrast) || 0, -100, 100) / 100) * 1.3),
+    gain: Math.pow(2, clamp(Number(params.exposure) || 0, -100, 100) / (100 / GRAY_EXPOSURE_STOPS)),
+    contrastK: Math.max(0.1, 1 + (clamp(Number(params.contrast) || 0, -100, 100) / 100) * GRAY_CONTRAST_SWING),
     sAmt: (clamp(Number(params.shadows) || 0, -100, 100) / 100) * 180,
     hAmt: (clamp(Number(params.highlights) || 0, -100, 100) / 100) * 180,
     shoulderNorm: 1 - Math.exp(-GRAY_SOFT * (1 - GRAY_KNEE)),

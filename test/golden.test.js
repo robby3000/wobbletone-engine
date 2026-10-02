@@ -14,7 +14,7 @@ const EXPECTED = {
   "saturate": "fb935706",
   "hue": "a79f0a5f",
   "sepia": "7a6332ba",
-  "grayscale": "18d92927",
+  "grayscale": "944d5f4a",
   "invert": "c6b326ad",
   "opacity": "dc8e84dd",
   "blur": "1d5e2e8f",
@@ -23,7 +23,7 @@ const EXPECTED = {
   "posterize": "bb26b925",
   "heatmap": "64249c1f",
   "shadowshighlights": "d8f893aa",
-  "drama": "ab4b7291",
+  "drama": "8ee891b7",
   "chromatic": "38ec18c5",
   "bloom": "b3fb5d15",
   "dropshadow": "e6664d18",
@@ -49,9 +49,9 @@ const EXPECTED = {
   "stack-film": "0975c57d",
   "stack-neon": "3ffdf3fe",
   "stack-signal": "f5e5037a",
-  "stack-print": "5f47365e",
+  "stack-print": "39c37f79",
   "stack-dream": "27342a91",
-  "stack-drama": "7891f42a",
+  "stack-drama": "33aa9ec2",
 };
 
 for (const [name, fixture, effects] of CASES) {
