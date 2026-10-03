@@ -19,20 +19,19 @@ import { applyBlurGPU } from "./effects/blur.js";
 import { GPU_OVERLAY_TYPES, applyOverlayGPU } from "./effects/overlay.js";
 import { applyGrainGPU, applyGlitchGPU, glitchUniformLimit } from "./effects/procedural.js";
 import { applyBloomGPU, applyChromaticGPU } from "./effects/composite.js";
+import { GPU_SUPPORT } from "./support.js";
 
-// Can every run of this spec render on GPU? (Shape check only —
-// param-dependent limits like blur kernel size are gated at render.)
+// Can every run of this spec render on GPU? Derives from the GPU_SUPPORT
+// table (gl/support.js) — fused runs need every effect fused-covered, and a
+// single-effect run needs a dedicated pass whose `when` gate (if any) passes.
+// Param-dependent limits like blur kernel size are still gated at render.
 export function canRenderGPU(spec) {
   try {
     const { effects } = validateSpec(spec);
     for (const run of planRuns(effects)) {
-      if (run.every((e) => canRunGPU(e.type))) continue;
-      if (run.length === 1 && run[0].type === "blur") continue;
-      if (run.length === 1 && GPU_OVERLAY_TYPES.has(run[0].type)) continue;
-      if (run.length === 1 && run[0].type === "grain") continue;
-      // glitch blocks are CPU-only — the GLSL path implements bands only.
-      if (run.length === 1 && run[0].type === "glitch" && !(Number(run[0].params.blocks) > 0)) continue;
-      if (run.length === 1 && (run[0].type === "bloom" || run[0].type === "chromatic")) continue;
+      if (run.every((e) => GPU_SUPPORT[e.type]?.fused)) continue;
+      const s = run.length === 1 && GPU_SUPPORT[run[0].type];
+      if (s && !s.fused && (!s.when || s.when(run[0].params))) continue;
       return false;
     }
     return true;
