@@ -18,14 +18,19 @@ Plain ES modules, zero dependencies, no build step. Tests run in Node:
 import { renderBuffer } from "./render.js";
 import { renderToCanvas } from "./canvas.js";
 
-const out = renderBuffer(buffer, spec, { renderer: "auto" });
+const out = renderBuffer(buffer, spec);
 // buffer: { data: Uint8ClampedArray, width, height } in RGBA straight alpha, sRGB
 // spec:   { format: "wobbletone-filter", version: 1, name, effects: [{ type, params }] }
+
+renderToCanvas(imageOrBitmap, spec, { renderer: "auto" });  // DOM path
 ```
 
-`renderer` accepts `"auto"` (default), `"cpu"`, or `"webgl2"`. Pixel-valued
-params are flagged `px: true` in `registry.js` and scaled by render resolution,
-so a preview and a full-res export of the same spec agree.
+`renderBuffer` is the CPU reference path — it has no renderer switch.
+Renderer selection happens through `renderToCanvas` / `renderBufferGPU`, which
+route via `pickRenderer`: `options.renderer` is `"cpu"` (default), `"webgl2"`,
+or `"auto"` (WebGL2 when it can cover the whole stack, CPU otherwise).
+Pixel-valued params are flagged `px: true` in `registry.js` and scaled by
+render resolution, so a preview and a full-res export of the same spec agree.
 
 ## Renderers
 
@@ -63,7 +68,7 @@ gl/
 
 ## Tests and parity
 
-- `npm test` → `node --test test/*.test.js` (376 tests).
+- `npm test` → `node --test test/*.test.js` (378 tests).
 - `test/golden.test.js` pins a hash of every golden case's CPU output.
   Regenerate expectations after intended changes with
   `scripts/dump-golden.mjs`.
