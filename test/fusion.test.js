@@ -15,6 +15,7 @@ import { infrared, vintage, psychedelic } from "../effects/compound.js";
 const PIXEL_LOCAL = [
   "brightness", "contrast", "saturate", "hue", "sepia", "grayscale", "invert", "opacity",
   "duotone", "tritone", "posterize", "solarize", "hueband", "heatmap", "shadowshighlights",
+  "mixer",
 ];
 
 const specOf = (effects) => createSpec(effects);

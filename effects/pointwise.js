@@ -109,6 +109,52 @@ export function grayscale(buffer, params = {}) {
   return runStep(buffer, (px) => grayscalePixel(px, pre));
 }
 
+/* ---------- channel mixer ---------- */
+
+// One param set (r/g/b/offset, all %) serves two modes:
+//   gain — out = in * (r,g,b)/100 + offset: per-channel brightness, the
+//          temperature/cast tool. Negative gains invert a channel.
+//   mono — gray = (r*R + g*G + b*B)/(|r|+|g|+|b|) + offset: weights are
+//          relative contributions, normalised so the mix itself cannot
+//          blow out; offset is the exposure control. Signed weights
+//          subtract a channel's light — the IR/ortho move that positive
+//          weight tables cannot express. All-zero weights give the flat
+//          offset value.
+// offset is a percentage of full scale added in both modes. Results clamp
+// to 0..255 — signed weights can legitimately push a channel to a rail.
+export function mixerPrepare(params = {}) {
+  const mono = String(params.mode || "Gain").toLowerCase() === "mono";
+  const pct = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d) / 100;
+  let wr = pct(params.r, 100);
+  let wg = pct(params.g, 100);
+  let wb = pct(params.b, 100);
+  if (mono) {
+    const sum = Math.abs(wr) + Math.abs(wg) + Math.abs(wb);
+    if (sum > 0) {
+      wr /= sum;
+      wg /= sum;
+      wb /= sum;
+    }
+  }
+  return { mono, wr, wg, wb, off: pct(params.offset, 0) * 255 };
+}
+export function mixerPixel(px, p) {
+  if (p.mono) {
+    const v = clamp(Math.round(p.wr * px[0] + p.wg * px[1] + p.wb * px[2] + p.off), 0, 255);
+    px[0] = v;
+    px[1] = v;
+    px[2] = v;
+    return;
+  }
+  px[0] = clamp(Math.round(px[0] * p.wr + p.off), 0, 255);
+  px[1] = clamp(Math.round(px[1] * p.wg + p.off), 0, 255);
+  px[2] = clamp(Math.round(px[2] * p.wb + p.off), 0, 255);
+}
+export function mixer(buffer, params = {}) {
+  const pre = mixerPrepare(params);
+  return runStep(buffer, (px) => mixerPixel(px, pre));
+}
+
 export function huePrepare(params) {
   const amount = (params.v * Math.PI) / 180;
   return { cos: Math.cos(amount), sin: Math.sin(amount) };

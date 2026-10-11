@@ -31,6 +31,7 @@ export const GPU_SUPPORT = {
   solarize:           { fused: true, params: ["amount", "threshold"] },
   hueband:            { fused: true, params: ["bands", "spread"] },
   shadowshighlights:  { fused: true, params: ["shadows", "highlights"] },
+  mixer:              { fused: true, params: ["mode", "r", "g", "b", "offset"] },
 
   // --- dedicated passes (gl/effects/*) ---
   blur:      { params: ["v"] },

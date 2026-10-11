@@ -88,6 +88,8 @@ export const CASES = [
   ["hue", "gradient", [{ type: "hue", params: { v: 45 } }]],
   ["sepia", "portrait", [{ type: "sepia", params: { v: 70 } }]],
   ["grayscale", "gradient", [{ type: "grayscale", params: { filter: "Red", intensity: 70, exposure: 20, contrast: 15, shadows: 25, highlights: -15 } }]],
+  ["mixer-gain", "gradient", [{ type: "mixer", params: { mode: "Gain", r: 120, g: 90, b: 60, offset: 5 } }]],
+  ["mixer-mono", "portrait", [{ type: "mixer", params: { mode: "Mono", r: -20, g: 110, b: -40, offset: 10 } }]],
   ["invert", "gradient", [{ type: "invert", params: { v: 100 } }]],
   ["opacity", "portrait", [{ type: "opacity", params: { v: 60 } }]],
   ["blur", "checker", [{ type: "blur", params: { v: 3 } }]],

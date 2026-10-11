@@ -15,7 +15,7 @@ const prep = (type, params) => EFFECTS[type].preparePixel(params);
 test("every pixel-local effect has a GLSL step", () => {
   const pixelLocal = Object.keys(EFFECTS).filter((t) => EFFECTS[t].pixelLocal);
   for (const type of pixelLocal) assert.ok(canRunGPU(type), `${type} missing GLSL step`);
-  assert.equal(pixelLocal.length, 15);
+  assert.equal(pixelLocal.length, 16);
 });
 
 test("non-pixel-local effects are not GPU steps", () => {

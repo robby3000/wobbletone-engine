@@ -60,6 +60,20 @@ export const EFFECTS = {
       intensity: num(0, 100, 50, { unit: "%" }),
     },
   },
+  mixer: {
+    category: "pointwise",
+    apply: pointwise.mixer,
+    pixelLocal: true,
+    applyPixel: pointwise.mixerPixel,
+    preparePixel: pointwise.mixerPrepare,
+    params: {
+      mode: sel(["Gain", "Mono"], "Gain"),
+      r: num(-200, 200, 100, { unit: "%" }),
+      g: num(-200, 200, 100, { unit: "%" }),
+      b: num(-200, 200, 100, { unit: "%" }),
+      offset: num(-100, 100, 0, { unit: "%" }),
+    },
+  },
   invert: { category: "pointwise", apply: pointwise.invert, pixelLocal: true, applyPixel: pointwise.invertPixel, preparePixel: pointwise.invertPrepare, params: { v: num(0, 100, 100, { unit: "%" }) } },
   opacity: { category: "pointwise", apply: pointwise.opacity, pixelLocal: true, applyPixel: pointwise.opacityPixel, preparePixel: pointwise.opacityPrepare, params: { v: num(0, 100, 80, { unit: "%" }) } },
 

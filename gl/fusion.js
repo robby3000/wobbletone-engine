@@ -132,6 +132,26 @@ const STEPS = {
       [`u${i}norm`, "float", p.shoulderNorm],
     ],
   },
+  mixer: {
+    decls: (i) => [
+      `uniform vec3 u${i}w;`,
+      `uniform float u${i}off;`,
+      `uniform float u${i}mono;`,
+    ],
+    call: (i) => `{
+      if (u${i}mono > 0.5) {
+        float v = clamp(rnd(dot(u${i}w, c.rgb) + u${i}off), 0.0, 255.0);
+        c.rgb = vec3(v);
+      } else {
+        c.rgb = clamp(rnd(c.rgb * u${i}w + vec3(u${i}off)), 0.0, 255.0);
+      }
+    }`,
+    vals: (i, p) => [
+      [`u${i}w`, "vec3", [p.wr, p.wg, p.wb]],
+      [`u${i}off`, "float", p.off],
+      [`u${i}mono`, "float", p.mono ? 1 : 0],
+    ],
+  },
   hue: {
     decls: (i) => [`uniform float u${i}cos;`, `uniform float u${i}sin;`],
     call: (i) => `{

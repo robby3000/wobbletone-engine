@@ -15,6 +15,8 @@ const EXPECTED = {
   "hue": "a79f0a5f",
   "sepia": "7a6332ba",
   "grayscale": "944d5f4a",
+  "mixer-gain": "50e91ecd",
+  "mixer-mono": "cf25e13e",
   "invert": "c6b326ad",
   "opacity": "dc8e84dd",
   "blur": "1d5e2e8f",

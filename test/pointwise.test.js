@@ -16,15 +16,16 @@ function run(name, params, rgba = SRC) {
   return [...b.data];
 }
 
-const POINTWISE = ["brightness", "contrast", "saturate", "hue", "sepia", "grayscale", "invert", "opacity"];
+const POINTWISE = ["brightness", "contrast", "saturate", "hue", "sepia", "grayscale", "mixer", "invert", "opacity"];
 
-test("known pixel values for all 8 pointwise effects", () => {
+test("known pixel values for all 9 pointwise effects", () => {
   assert.deepEqual(run("brightness", { v: 110 }), [88, 132, 220, 201]);
   assert.deepEqual(run("contrast", { v: 110 }), [75, 119, 207, 201]);
   assert.deepEqual(run("saturate", { v: 120 }), [73, 121, 217, 201]);
   assert.deepEqual(run("hue", { v: 180 }), [154, 114, 34, 201]);
   assert.deepEqual(run("sepia", { v: 100 }), [162, 144, 112, 201]);
   assert.deepEqual(run("grayscale", { v: 100 }), [117, 117, 117, 201]);
+  assert.deepEqual(run("mixer", { mode: "Gain", r: 80, g: 110, b: 50 }), [64, 132, 100, 201]);
   assert.deepEqual(run("invert", { v: 100 }), [175, 135, 55, 201]);
   assert.deepEqual(run("opacity", { v: 80 }), [80, 120, 200, 161]);
 });
@@ -41,6 +42,7 @@ test("identity cases leave pixels unchanged", () => {
     ["saturate", { v: 100 }],
     ["hue", { v: 0 }],
     ["sepia", { v: 0 }],
+    ["mixer", {}],
     ["invert", { v: 0 }],
     ["opacity", { v: 100 }],
   ]) {
@@ -97,7 +99,7 @@ test("grayscale shadows/highlights act only on their tonal regions", () => {
 
 test("alpha preserved by every pointwise effect except opacity", () => {
   const b = px([10, 20, 30, 77]);
-  for (const name of ["brightness", "contrast", "saturate", "hue", "sepia", "grayscale", "invert"]) {
+  for (const name of ["brightness", "contrast", "saturate", "hue", "sepia", "grayscale", "mixer", "invert"]) {
     const c = px([10, 20, 30, 77]);
     pointwise[name](c, { v: 90 });
     assert.equal(c.data[3], 77, `${name} must not touch alpha`);
@@ -129,7 +131,35 @@ test("effect order matters", () => {
   assert.notDeepEqual([...a.data], [...b.data]);
 });
 
-test("registry wires apply for all 8 pointwise effects", () => {
+test("mixer gain: per-channel scale and negative gain", () => {
+  assert.deepEqual(run("mixer", { mode: "Gain", r: 50, g: 100, b: 200 }), [40, 120, 255, 201]);
+  assert.deepEqual(run("mixer", { mode: "Gain", r: -100 }), [0, 120, 200, 201]);
+});
+
+test("mixer gain: offset lifts every channel", () => {
+  assert.deepEqual(run("mixer", { offset: 20 }), [131, 171, 251, 201]);
+  assert.deepEqual(run("mixer", { offset: -50 }), [0, 0, 73, 201]);
+});
+
+test("mixer mono: weights normalise, so defaults give the channel average", () => {
+  assert.deepEqual(run("mixer", { mode: "Mono" }), [133, 133, 133, 201]);
+  // Luminance ratios reproduce the neutral darkroom conversion.
+  const gray = run("mixer", { mode: "Mono", r: 21.26, g: 71.52, b: 7.22 });
+  assert.deepEqual(gray, [117, 117, 117, 201]);
+  assert.deepEqual(gray.slice(0, 3), run("grayscale", {}).slice(0, 3));
+});
+
+test("mixer mono: signed weights darken a channel below its floor", () => {
+  // The IR/ortho move that positive weight tables cannot express.
+  const sky = run("mixer", { mode: "Mono", r: 0, g: 100, b: -50 }, [30, 60, 220, 255]);
+  assert.deepEqual(sky, [0, 0, 0, 255]);
+});
+
+test("mixer mode is case-insensitive in prepare", () => {
+  assert.deepEqual(run("mixer", { mode: "mono", r: 100, g: 0, b: 0 }), [80, 80, 80, 201]);
+});
+
+test("registry wires apply for all 9 pointwise effects", () => {
   for (const type of POINTWISE) {
     assert.equal(typeof EFFECTS[type].apply, "function", `${type} missing apply`);
     assert.equal(EFFECTS[type].apply, pointwise[type], `${type} apply mismatch`);

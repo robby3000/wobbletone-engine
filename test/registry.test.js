@@ -4,7 +4,7 @@ import { EFFECTS, EFFECT_TYPES } from "../registry.js";
 import { BLEND_MODES } from "../color.js";
 
 const EXPECTED_TYPES = [
-  "brightness", "contrast", "saturate", "hue", "sepia", "grayscale", "invert", "opacity",
+  "brightness", "contrast", "saturate", "hue", "sepia", "grayscale", "mixer", "invert", "opacity",
   "blur",
   "duotone", "tritone", "posterize", "solarize", "hueband", "heatmap", "shadowshighlights", "drama",
   "bloom", "chromatic", "dropshadow",
