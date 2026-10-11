@@ -65,7 +65,10 @@ const BW_FILTERS = {
   yellow: [0.34, 0.5, 0.08],
   orange: [0.5, 0.35, 0.03],
   red: [0.62, 0.12, 0.02],
-  green: [0.1, 0.8, 0.08],
+  // Green is boosted past physical transmission: green already dominates
+  // standard luminance (0.72), so a gentle row reads as no-op. This row
+  // makes greens lift and reds collapse; exposure is the compensation.
+  green: [0.05, 0.9, 0.12],
   blue: [0.06, 0.2, 0.6],
 };
 
